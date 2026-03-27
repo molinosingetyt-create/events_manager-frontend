@@ -1,0 +1,400 @@
+/* Design tokens — Molinos del Atlántico / La Nieve (logo corporativo) */
+:root {
+  /* Marca */
+  --em-brand-navy: #1a2b6d;
+  --em-brand-navy-dark: #121e4d;
+  --em-brand-red: #e31e24;
+  --em-brand-gold: #d4a037;
+  --em-brand-green: #008c45;
+
+  --em-bg: #f4f6fa;
+  --em-surface: #ffffff;
+  --em-border: #e2e6ef;
+  --em-text: #161c2d;
+  --em-text-muted: #5c6578;
+  --em-primary-ghost: rgba(26, 43, 109, 0.08);
+  --em-primary-border: rgba(26, 43, 109, 0.22);
+  --em-radius: 12px;
+  --em-radius-sm: 8px;
+  --em-shadow: 0 1px 3px rgba(26, 43, 109, 0.07);
+  --em-shadow-md: 0 4px 14px rgba(26, 43, 109, 0.09);
+}
+
+/*
+ * Angular Material 3 (tema prebuilt azure-blue) — alineación con marca.
+ * Se aplican después del CSS prebuilt en angular.json.
+ */
+html {
+  --mat-sys-primary: var(--em-brand-navy);
+  --mat-sys-on-primary: #ffffff;
+  --mat-sys-primary-container: #dce2f5;
+  --mat-sys-on-primary-container: #0f1a4d;
+  --mat-sys-inverse-primary: #b4c4f0;
+  --mat-sys-primary-fixed: #dce2f5;
+  --mat-sys-primary-fixed-dim: #b4c4f0;
+  --mat-sys-on-primary-fixed: #0a1238;
+  --mat-sys-on-primary-fixed-variant: #1a2b6d;
+  --mat-sys-surface-tint: var(--em-brand-navy);
+
+  --mat-sys-tertiary: var(--em-brand-gold);
+  --mat-sys-on-tertiary: #ffffff;
+  --mat-sys-tertiary-container: #f6e9c8;
+  --mat-sys-on-tertiary-container: #4a3700;
+  --mat-sys-tertiary-fixed: #f6e9c8;
+  --mat-sys-tertiary-fixed-dim: #e3cf9a;
+  --mat-sys-on-tertiary-fixed: #2c2100;
+  --mat-sys-on-tertiary-fixed-variant: #5c4500;
+
+  --mat-sys-error: var(--em-brand-red);
+  --mat-sys-on-error: #ffffff;
+  --mat-sys-error-container: #ffdad4;
+  --mat-sys-on-error-container: #93000a;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: 'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--em-text);
+  background: var(--em-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+/* Contenido principal (dentro del shell) */
+.shell-content {
+  min-height: calc(100vh - 64px);
+  background: var(--em-bg);
+}
+
+.shell-content .content {
+  padding: 1.25rem 1.25rem 2rem;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+@media (min-width: 960px) {
+  .shell-content .content {
+    padding: 1.5rem 1.75rem 2.5rem;
+  }
+}
+
+/* Títulos de página */
+.content h1 {
+  font-size: 1.625rem;
+  font-weight: 700;
+  color: var(--em-text);
+  margin: 0 0 0.35rem;
+  letter-spacing: -0.03em;
+}
+
+.content .page-lead,
+.content > p.muted {
+  color: var(--em-text-muted);
+  font-size: 0.95rem;
+  margin: 0 0 1.25rem;
+  line-height: 1.45;
+}
+
+/* Cabecera de listados (botón + título) */
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.page-head h1 {
+  margin-bottom: 0.2rem;
+}
+
+.page-head .page-lead {
+  width: 100%;
+  margin: 0;
+  flex-basis: 100%;
+  order: 3;
+}
+
+.page-head .actions {
+  flex-shrink: 0;
+}
+
+/* Tarjetas Material en contenido */
+.content .mat-mdc-card {
+  border-radius: var(--em-radius);
+  border: 1px solid var(--em-border);
+  box-shadow: var(--em-shadow);
+  background: var(--em-surface);
+  overflow: hidden;
+}
+
+.content .mat-mdc-card .mat-mdc-card-content {
+  padding: 0 1rem 1rem;
+}
+
+@media (min-width: 600px) {
+  .content .mat-mdc-card .mat-mdc-card-content {
+    padding: 0 1.25rem 1.25rem;
+  }
+}
+
+/* Tablas */
+.content .mat-mdc-table {
+  background: transparent;
+}
+
+.content table.mat-mdc-table {
+  border-radius: var(--em-radius-sm);
+}
+
+.content .mat-mdc-header-row {
+  background: rgba(26, 43, 109, 0.04);
+}
+
+.content .mat-mdc-header-cell {
+  font-weight: 600;
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--em-text-muted);
+  border-bottom-color: var(--em-border) !important;
+}
+
+.content .mat-mdc-cell {
+  border-bottom-color: var(--em-border) !important;
+  font-size: 0.9375rem;
+}
+
+.content .mat-mdc-row:hover {
+  background: rgba(26, 43, 109, 0.04);
+}
+
+/* Paginador */
+.content .mat-mdc-paginator {
+  border-top: 1px solid var(--em-border);
+  background: #fafbfc;
+  border-radius: 0 0 var(--em-radius-sm) var(--em-radius-sm);
+}
+
+/* Botones de acción en filas — siempre en horizontal (móvil/tablet incl.) */
+.action-row {
+  display: inline-flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.2rem;
+  vertical-align: middle;
+}
+
+.action-row .mat-mdc-icon-button {
+  flex: 0 0 auto;
+}
+
+/* Celdas de tabla con acciones: no partir en varias líneas */
+.content .mat-mdc-cell:has(.action-row) {
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.content .mat-mdc-cell .action-row {
+  width: max-content;
+  max-width: none;
+}
+
+/* Focus visible accesible */
+a:focus-visible,
+button:focus-visible,
+.mat-mdc-button:focus-visible {
+  outline: 2px solid var(--em-brand-gold);
+  outline-offset: 2px;
+}
+
+/* Scroll horizontal en tablas en móvil */
+.table-scroll {
+  overflow-x: auto;
+  margin: 0 -0.25rem;
+  padding: 0 0.25rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Modales Material — solo el título centrado; cuerpo ocupa todo el ancho del panel */
+.em-dialog {
+  text-align: left;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.em-dialog > h2[mat-dialog-title] {
+  text-align: center;
+  margin: 0 0 0.35rem;
+  padding: 0 0.5rem;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.em-dialog mat-dialog-content {
+  text-align: left;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.em-dialog mat-dialog-content .form,
+.em-dialog mat-dialog-content:not(.content-view).content,
+.em-dialog mat-dialog-content .detail-panel {
+  width: 100%;
+  max-width: 100%;
+  text-align: left;
+  box-sizing: border-box;
+}
+
+/* Modal solo lectura: líneas tipo "ID: 1" / "Nombre: …" */
+.em-dialog mat-dialog-content.content.content-view {
+  text-align: left;
+}
+
+.em-dialog mat-dialog-content.content.content-view .detail-lines {
+  width: 100%;
+  max-width: 28rem;
+  margin: 0;
+  padding: 0;
+}
+
+.em-dialog mat-dialog-content.content.content-view .detail-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 0.5rem;
+  row-gap: 0.125rem;
+  margin: 0 0 0.5rem;
+  line-height: 1.5;
+  font-size: 0.9375rem;
+  color: var(--em-text);
+}
+
+.em-dialog mat-dialog-content.content.content-view .detail-line:last-child {
+  margin-bottom: 0;
+}
+
+.em-dialog mat-dialog-content.content.content-view .detail-label {
+  flex-shrink: 0;
+  font-weight: 600;
+  color: var(--em-text-muted);
+}
+
+.em-dialog mat-dialog-content.content.content-view .detail-value {
+  min-width: 0;
+  font-weight: 500;
+  color: var(--em-text);
+}
+
+.em-dialog mat-dialog-content.content.content-view .detail-value .muted {
+  color: var(--em-text-muted);
+  font-weight: 400;
+}
+
+.em-dialog mat-dialog-content .loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.em-dialog mat-dialog-content p:not(.hint) {
+  margin: 0 0 0.75rem;
+  max-width: 28rem;
+}
+
+.em-dialog .hint {
+  text-align: left;
+  max-width: 100%;
+  margin: 0 0 0.5rem;
+}
+
+.em-dialog mat-dialog-actions {
+  gap: 0.5rem;
+  padding-top: 0.25rem !important;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.em-dialog mat-dialog-actions[align='start'],
+.em-dialog mat-dialog-actions:not([align]) {
+  justify-content: flex-start;
+}
+
+.em-dialog mat-dialog-actions[align='end'] {
+  justify-content: flex-end;
+}
+
+/* Iconos de acción en tablas — marca */
+.action-btn-view mat-icon {
+  color: var(--em-brand-navy);
+}
+
+.action-btn-edit mat-icon {
+  color: var(--em-brand-gold);
+}
+
+.action-btn-delete mat-icon {
+  color: var(--em-brand-red);
+}
+
+/* Menú de notificaciones (overlay fuera del shell) */
+.notif-menu-panel.mat-mdc-menu-panel {
+  max-width: min(96vw, 380px);
+}
+.notif-menu-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem 0.45rem;
+  border-bottom: 1px solid var(--em-border);
+  font-weight: 600;
+  font-size: 0.8125rem;
+  color: var(--em-text);
+}
+.notif-menu-body {
+  max-height: min(50vh, 320px);
+  overflow-y: auto;
+}
+.notif-menu-body .notif-empty {
+  padding: 1rem 1.25rem;
+  font-size: 0.8125rem;
+  color: var(--em-text-muted);
+}
+button.mat-mdc-menu-item.notif-row {
+  white-space: normal;
+  height: auto;
+  min-height: 48px;
+  line-height: 1.35;
+  align-items: flex-start;
+  padding-top: 0.65rem;
+  padding-bottom: 0.65rem;
+}
+.notif-row .notif-msg {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--em-text);
+}
+.notif-row .notif-time {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--em-text-muted);
+  margin-top: 0.25rem;
+}
