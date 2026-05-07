@@ -5,7 +5,9 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { forkJoin } from 'rxjs';
 import { ApiService, Paginated } from '../../core/services/api.service';
+import { AuthService } from '../../core/services/auth.service';
 import {
   SearchableSelectComponent,
   type SearchableOption,
@@ -17,6 +19,12 @@ interface AreaRow {
   name: string;
 }
 
+interface TemporalRow {
+  id: number;
+  name: string;
+  status: string;
+}
+
 interface EmployeeRead {
   id: number;
   name: string;
@@ -26,6 +34,8 @@ interface EmployeeRead {
   area_name: string;
   leader_id: number | null;
   leader_name: string | null;
+  temporal_category_id: number | null;
+  temporal_category_name: string;
   status: string;
 }
 
@@ -67,6 +77,11 @@ interface EmployeeRead {
             label="Área"
             [control]="form.controls.area_id"
             [options]="areaOptions"
+          />
+          <em-searchable-select
+            label="Temporal (categoría)"
+            [control]="form.controls.temporal_category_id"
+            [options]="temporalOptions"
           />
           <em-searchable-select
             label="Líder (usuario)"
@@ -121,10 +136,12 @@ interface EmployeeRead {
 export class EmployeeEditDialogComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly api = inject(ApiService);
+  private readonly auth = inject(AuthService);
   readonly ref = inject(MatDialogRef<EmployeeEditDialogComponent>);
   private readonly employeeId = inject(MAT_DIALOG_DATA) as number;
 
   areaOptions: SearchableOption<number>[] = [];
+  temporalOptions: SearchableOption<number>[] = [];
   leaderOptions: SearchableOption<number>[] = [];
   readonly statusOptions = ENTITY_STATUS_OPTIONS;
   loaded = false;
@@ -136,6 +153,7 @@ export class EmployeeEditDialogComponent implements OnInit {
     identification_number: ['', Validators.required],
     position: ['', Validators.required],
     area_id: [0, [Validators.required, Validators.min(1)]],
+    temporal_category_id: [0, [Validators.required, Validators.min(1)]],
     leader_id: [null as number | null],
     status: ['active', Validators.required],
   });
@@ -147,20 +165,32 @@ export class EmployeeEditDialogComponent implements OnInit {
       }
     });
 
-    this.api.get<Paginated<AreaRow>>('/areas', { page: 1, page_size: 200 }).subscribe({
-      next: (r) => {
-        this.areaOptions = r.items.map((a) => ({ value: a.id, label: a.name }));
-      },
-    });
+    forkJoin({
+      areas: this.api.get<Paginated<AreaRow>>('/areas', { page: 1, page_size: 200 }),
+      temps: this.api.get<Paginated<TemporalRow>>('/temporal-categories', { page: 1, page_size: 200 }),
+      emp: this.api.get<EmployeeRead>(`/employees/${this.employeeId}`),
+    }).subscribe({
+      next: ({ areas, temps, emp: e }) => {
+        this.areaOptions = areas.items.map((a) => ({ value: a.id, label: a.name }));
+        let opts = temps.items.map((x) => ({ value: x.id, label: x.name }));
+        const tid = e.temporal_category_id;
+        if (
+          tid != null &&
+          tid > 0 &&
+          !opts.some((o) => o.value === tid) &&
+          e.temporal_category_name
+        ) {
+          opts = [{ value: tid, label: e.temporal_category_name }, ...opts];
+        }
+        this.temporalOptions = opts;
 
-    this.api.get<EmployeeRead>(`/employees/${this.employeeId}`).subscribe({
-      next: (e) => {
         this.form.patchValue(
           {
             name: e.name,
             identification_number: e.identification_number,
             position: e.position,
             area_id: e.area_id,
+            temporal_category_id: tid != null && tid > 0 ? tid : 0,
             leader_id: e.leader_id,
             status: e.status,
           },
@@ -181,15 +211,13 @@ export class EmployeeEditDialogComponent implements OnInit {
     keepLeaderId: number | null | undefined,
     keepLeaderName: string | null | undefined,
   ): void {
-    this.api
-      .get<Paginated<{ id: number; name: string }>>('/users', {
-        page: 1,
-        page_size: 200,
-        role: 'LEADER',
-        area_id: areaId,
-      })
-      .subscribe((res) => {
-        let opts = res.items.map((u) => ({ value: u.id, label: u.name }));
+    const params: Record<string, string | number> = { area_id: areaId };
+    if (!this.auth.hasRole('ADMIN')) {
+      params['role'] = 'LEADER';
+    }
+    this.api.getAllPages<{ id: number; name: string }>('/users', params).subscribe({
+      next: (items) => {
+        let opts = items.map((u) => ({ value: u.id, label: u.name }));
         if (
           keepLeaderId != null &&
           keepLeaderId > 0 &&
@@ -204,7 +232,8 @@ export class EmployeeEditDialogComponent implements OnInit {
         if (cur != null && cur > 0 && !opts.some((o) => o.value === cur)) {
           this.form.patchValue({ leader_id: null }, { emitEvent: false });
         }
-      });
+      },
+    });
   }
 
   submit(): void {
@@ -219,6 +248,7 @@ export class EmployeeEditDialogComponent implements OnInit {
       identification_number: raw.identification_number!,
       position: raw.position!,
       area_id: raw.area_id!,
+      temporal_category_id: raw.temporal_category_id!,
       status: raw.status!,
       leader_id: lid != null && lid > 0 ? lid : null,
     };

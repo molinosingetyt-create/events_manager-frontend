@@ -11,7 +11,13 @@ import {
   SearchableSelectComponent,
   type SearchableOption,
 } from '../../shared/searchable-select/searchable-select.component';
-import { ENTITY_STATUS_OPTIONS, ROLE_OPTIONS } from '../../shared/searchable-select/select-options';
+import { ENTITY_STATUS_OPTIONS } from '../../shared/searchable-select/select-options';
+
+interface ProfileRow {
+  id: number;
+  code: string;
+  name: string;
+}
 
 interface AreaRow {
   id: number;
@@ -100,7 +106,7 @@ export class UserEditDialogComponent implements OnInit {
   private readonly userId = inject(MAT_DIALOG_DATA) as number;
 
   areaOptions: SearchableOption<number>[] = [];
-  readonly roleOptions = ROLE_OPTIONS;
+  roleOptions: SearchableOption<string>[] = [];
   readonly statusOptions = ENTITY_STATUS_OPTIONS;
   loaded = false;
   loadError = false;
@@ -116,6 +122,14 @@ export class UserEditDialogComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    this.api.get<ProfileRow[]>('/security/profiles').subscribe({
+      next: (profiles) => {
+        this.roleOptions = profiles.map((p) => ({
+          value: p.code,
+          label: `${p.name} (${p.code})`,
+        }));
+      },
+    });
     this.api.get<Paginated<AreaRow>>('/areas', { page: 1, page_size: 200 }).subscribe((r) => {
       this.areaOptions = r.items.map((a) => ({ value: a.id, label: a.name }));
     });

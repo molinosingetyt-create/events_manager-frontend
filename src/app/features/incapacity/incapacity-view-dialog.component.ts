@@ -1,12 +1,11 @@
 import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
+import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { publicAssetUrl } from '../../core/utils/public-asset-url';
 import { ApiService } from '../../core/services/api.service';
 import { TranslateLabelPipe } from '../../core/pipes/translate-label.pipe';
-
 interface UserBrief {
   id: number;
   name: string;
@@ -28,27 +27,60 @@ export interface IncapacityNoteDetail {
   id: number;
   employee_id: number;
   employee_name: string;
+  employee_identification?: string;
   type: string;
+  temporal_category_id: number;
+  temporal_category_name: string;
+  eps_arl_id: number | null;
+  eps_arl_label: string;
+  diagnosis_id: number | null;
+  diagnosis_code: string;
+  diagnosis_name: string;
   description: string;
   support: string | null;
   start_date: string;
   end_date: string | null;
+  long_absence_document_kind: string | null;
   file_url: string | null;
+  long_absence_second_file_url: string | null;
+  long_absence_eps_transcribed_text: string | null;
   created_by: number;
   creator: UserBrief | null;
   status: string;
   created_at: string;
   updated_at: string;
   history: HistoryEntry[];
+  extensions?: {
+    id: number;
+    incapacity_id: number;
+    start_date: string;
+    end_date: string;
+    file_url: string;
+    note: string;
+    created_by: number;
+    created_at: string;
+    updated_at: string;
+  }[];
 }
 
 @Component({
   selector: 'em-incapacity-view-dialog',
   standalone: true,
-  imports: [DatePipe, MatDialogModule, MatButtonModule, MatProgressSpinnerModule, TranslateLabelPipe],
+  imports: [
+    DatePipe,
+    MatDialogModule,
+    MatIconModule,
+    MatProgressSpinnerModule,
+    TranslateLabelPipe,
+  ],
   template: `
     <div class="em-dialog">
-      <h2 mat-dialog-title>Historial de solicitud</h2>
+      <div class="dialog-header">
+        <button type="button" mat-dialog-close class="dialog-close-btn" aria-label="Cerrar">
+          <mat-icon>close</mat-icon>
+        </button>
+        <h2 mat-dialog-title class="dialog-title-centered">Historial de solicitud</h2>
+      </div>
       <mat-dialog-content class="content content-view">
         @if (loading) {
           <div class="loading"><mat-spinner diameter="40" /></div>
@@ -68,11 +100,32 @@ export interface IncapacityNoteDetail {
                       <span class="hist-head-right">fecha: {{ h.created_at | date: 'short' }}</span>
                     </div>
                     <div class="hist-sub">
-                      <div class="hist-sub-line">Empleado: {{ detail.employee_name }}</div>
+                      <div class="hist-sub-line">
+                        Empleado: {{ detail.employee_name }}
+                        @if (detail.employee_identification) {
+                          — {{ detail.employee_identification }}
+                        }
+                      </div>
                       <div class="hist-sub-line">Tipo: {{ detail.type | translateLabel: 'incapacityType' }}</div>
+                      <div class="hist-sub-line">Temporal: {{ detail.temporal_category_name }}</div>
+                      <div class="hist-sub-line">EPS/ARL: {{ detail.eps_arl_label || '—' }}</div>
+                      <div class="hist-sub-line">
+                        Diagnóstico:
+                        @if (detail.diagnosis_code) {
+                          {{ detail.diagnosis_code }} — {{ detail.diagnosis_name }}
+                        } @else {
+                          —
+                        }
+                      </div>
                       <div class="hist-sub-line">Inicio: {{ lineStart(h) }}</div>
                       <div class="hist-sub-line">Fin: {{ lineEnd(h) }}</div>
                       <div class="hist-sub-line">Descripción: {{ detail.description }}</div>
+                      @if (detail.long_absence_document_kind) {
+                        <div class="hist-sub-line">
+                          Documentación (3+ días):
+                          {{ detail.long_absence_document_kind | translateLabel: 'longAbsenceDocumentKind' }}
+                        </div>
+                      }
                       @if (detail.support) {
                         <div class="hist-sub-line">Soporte (texto): {{ detail.support }}</div>
                       }
@@ -91,6 +144,29 @@ export interface IncapacityNoteDetail {
                               class="support-img"
                             />
                           </a>
+                        </div>
+                      }
+                      @if (detail.long_absence_second_file_url) {
+                        <div class="hist-sub-line support-img-wrap">
+                          <span class="support-img-caption">Soporte adicional (3+ días)</span>
+                          <a
+                            [href]="assetUrl(detail.long_absence_second_file_url)"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="support-img-link"
+                          >
+                            <img
+                              [src]="assetUrl(detail.long_absence_second_file_url)"
+                              alt="Soporte adicional"
+                              class="support-img"
+                            />
+                          </a>
+                        </div>
+                      }
+                      @if (detail.long_absence_eps_transcribed_text) {
+                        <div class="hist-sub-line hist-text-block">
+                          <span class="support-img-caption">Texto transcrito (incapacidad EPS)</span>
+                          <p class="eps-transcribed">{{ detail.long_absence_eps_transcribed_text }}</p>
                         </div>
                       }
                     </div>
@@ -118,6 +194,39 @@ export interface IncapacityNoteDetail {
                     <div class="hist-sub">
                       <div class="hist-sub-line">Comentario: {{ h.comment || '—' }}</div>
                     </div>
+                  }
+                  @case ('extension_added') {
+                    <div class="hist-head">
+                      <span class="hist-head-left"
+                        >Prórroga registrada:
+                        <strong class="hist-name">{{ actorName(h) }}</strong></span
+                      >
+                      <span class="hist-head-right">fecha: {{ h.created_at | date: 'short' }}</span>
+                    </div>
+                    @if (extensionSnapshot(h.snapshot); as snap) {
+                      <div class="hist-sub">
+                        <div class="hist-sub-line"><strong>Inicio:</strong> {{ snap.start_date }}</div>
+                        <div class="hist-sub-line"><strong>Fin:</strong> {{ snap.end_date }}</div>
+                        <div class="hist-sub-line"><strong>Comentario:</strong> {{ snap.note }}</div>
+                        @if (snap.file_url) {
+                          <div class="hist-sub-line support-img-wrap">
+                            <span class="support-img-caption">Soporte (imagen prórroga)</span>
+                            <a
+                              [href]="assetUrl(snap.file_url)"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="support-img-link"
+                            >
+                              <img
+                                [src]="assetUrl(snap.file_url)"
+                                alt="Imagen de la prórroga"
+                                class="support-img"
+                              />
+                            </a>
+                          </div>
+                        }
+                      </div>
+                    }
                   }
                   @case ('updated') {
                     <div class="hist-head">
@@ -158,9 +267,6 @@ export interface IncapacityNoteDetail {
           </div>
         }
       </mat-dialog-content>
-      <mat-dialog-actions align="end">
-        <button mat-flat-button color="warn" mat-dialog-close>Cerrar</button>
-      </mat-dialog-actions>
     </div>
   `,
   styles: `
@@ -168,6 +274,65 @@ export interface IncapacityNoteDetail {
       display: flex;
       justify-content: center;
       padding: 2rem;
+    }
+    .content-view {
+      overflow-x: hidden;
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+    .dialog-header {
+      position: relative;
+      padding: 0.35rem 2.75rem 0.65rem;
+      text-align: center;
+    }
+    .dialog-title-centered {
+      margin: 0 auto;
+      padding: 0 0.5rem;
+      max-width: 100%;
+      font-size: 1.2rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      line-height: 1.35;
+      text-align: center;
+    }
+    .dialog-close-btn {
+      position: absolute;
+      top: 0.2rem;
+      right: 0.15rem;
+      z-index: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2.25rem;
+      height: 2.25rem;
+      padding: 0;
+      margin: 0;
+      border: none;
+      border-radius: 50%;
+      background: transparent;
+      color: #103847;
+      cursor: pointer;
+      transition:
+        background-color 0.15s ease,
+        color 0.15s ease,
+        transform 0.12s ease;
+    }
+    .dialog-close-btn:hover {
+      background: rgba(15, 23, 42, 0.07);
+      color: #103847;
+    }
+    .dialog-close-btn:focus-visible {
+      outline: 2px solid var(--em-brand-navy, #0066CC);
+      outline-offset: 2px;
+    }
+    .dialog-close-btn:active {
+      transform: scale(0.96);
+    }
+    .dialog-close-btn mat-icon {
+      font-size: 1.35rem;
+      width: 1.35rem;
+      height: 1.35rem;
+      line-height: 1.35rem;
     }
     .hist-root {
       text-align: left;
@@ -196,7 +361,7 @@ export interface IncapacityNoteDetail {
     .hist-head-right {
       flex: 0 0 auto;
       font-size: 0.875rem;
-      color: var(--em-text-muted, #64748b);
+      color: var(--em-text-muted, #103847);
       white-space: nowrap;
     }
     .hist-name {
@@ -205,13 +370,13 @@ export interface IncapacityNoteDetail {
     .hist-sub {
       margin-top: 0.45rem;
       padding-left: 1.75rem;
-      border-left: 2px solid #e2e8f0;
+      border-left: 2px solid #FCEDD9;
       margin-left: 0.15rem;
     }
     .hist-sub-line {
       font-size: 0.9rem;
       line-height: 1.5;
-      color: var(--em-text, #0f172a);
+      color: var(--em-text, #103847);
       white-space: pre-wrap;
     }
     .support-img-wrap {
@@ -221,11 +386,17 @@ export interface IncapacityNoteDetail {
       display: block;
       font-size: 0.85rem;
       margin-bottom: 0.35rem;
-      color: var(--em-text-muted, #64748b);
+      color: var(--em-text-muted, #103847);
     }
     .support-img-link {
       display: block;
       max-width: 100%;
+    }
+    .hist-text-block .eps-transcribed {
+      margin: 0.25rem 0 0;
+      font-size: 0.9rem;
+      line-height: 1.45;
+      white-space: pre-wrap;
     }
     .support-img {
       display: block;
@@ -233,9 +404,9 @@ export interface IncapacityNoteDetail {
       max-height: 240px;
       height: auto;
       border-radius: 8px;
-      border: 1px solid var(--em-border, #e2e6ef);
+      border: 1px solid var(--em-border, #FCEDD9);
       object-fit: contain;
-      background: #f8fafc;
+      background: #FCEDD9;
     }
   `,
 })
@@ -252,6 +423,12 @@ export class IncapacityViewDialogComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.loadDetail();
+  }
+
+  private loadDetail(): void {
+    this.loading = true;
+    this.error = false;
     this.api.get<IncapacityNoteDetail>(`/incapacity-notes/${this.noteId}`).subscribe({
       next: (d) => {
         this.detail = d;
@@ -262,6 +439,24 @@ export class IncapacityViewDialogComponent implements OnInit {
         this.loading = false;
       },
     });
+  }
+
+  extensionSnapshot(snapshot: string | null): {
+    start_date: string;
+    end_date: string;
+    note: string;
+    file_url: string;
+  } | null {
+    const o = this.parseSnapshotObj(snapshot);
+    if (!o) {
+      return null;
+    }
+    return {
+      start_date: String(o['start_date'] ?? ''),
+      end_date: String(o['end_date'] ?? ''),
+      note: String(o['note'] ?? ''),
+      file_url: String(o['file_url'] ?? ''),
+    };
   }
 
   actorName(h: HistoryEntry): string {
@@ -303,6 +498,15 @@ export class IncapacityViewDialogComponent implements OnInit {
     const lines: string[] = [];
     if (o['type'] != null) {
       lines.push(`Tipo: ${String(o['type'])}`);
+    }
+    if (o['temporal_category_id'] != null) {
+      lines.push(`Temporal (id): ${String(o['temporal_category_id'])}`);
+    }
+    if (o['eps_arl_id'] != null) {
+      lines.push(`EPS/ARL (id): ${String(o['eps_arl_id'])}`);
+    }
+    if (o['diagnosis_id'] != null) {
+      lines.push(`Diagnóstico (id): ${String(o['diagnosis_id'])}`);
     }
     if (o['start_date'] != null) {
       lines.push(`Inicio: ${String(o['start_date'])}`);

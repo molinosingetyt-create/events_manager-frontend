@@ -10,7 +10,11 @@ import {
   SearchableSelectComponent,
   type SearchableOption,
 } from '../../shared/searchable-select/searchable-select.component';
-import { ENTITY_STATUS_OPTIONS, ROLE_OPTIONS } from '../../shared/searchable-select/select-options';
+interface ProfileRow {
+  id: number;
+  code: string;
+  name: string;
+}
 
 interface AreaRow {
   id: number;
@@ -48,7 +52,6 @@ interface AreaRow {
         </mat-form-field>
         <em-searchable-select label="Rol" [control]="form.controls.role" [options]="roleOptions" />
         <em-searchable-select label="Área" [control]="form.controls.area_id" [options]="areaOptions" />
-        <em-searchable-select label="Estado" [control]="form.controls.status" [options]="statusOptions" />
       </form>
       </mat-dialog-content>
       <mat-dialog-actions align="start">
@@ -83,8 +86,7 @@ export class UserCreateDialogComponent implements OnInit {
   readonly ref = inject(MatDialogRef<UserCreateDialogComponent>);
 
   areaOptions: SearchableOption<number>[] = [];
-  readonly roleOptions = ROLE_OPTIONS;
-  readonly statusOptions = ENTITY_STATUS_OPTIONS;
+  roleOptions: SearchableOption<string>[] = [];
   loading = false;
 
   readonly form = this.fb.nonNullable.group({
@@ -93,10 +95,21 @@ export class UserCreateDialogComponent implements OnInit {
     password: ['', [Validators.required, Validators.minLength(8)]],
     role: ['ADMIN', Validators.required],
     area_id: [0, [Validators.required, Validators.min(1)]],
-    status: ['active', Validators.required],
   });
 
   ngOnInit(): void {
+    this.api.get<ProfileRow[]>('/security/profiles').subscribe({
+      next: (profiles) => {
+        this.roleOptions = profiles.map((p) => ({
+          value: p.code,
+          label: `${p.name} (${p.code})`,
+        }));
+        if (profiles.length && !this.form.get('role')?.value) {
+          const admin = profiles.find((p) => p.code === 'ADMIN');
+          this.form.patchValue({ role: admin?.code ?? profiles[0].code });
+        }
+      },
+    });
     this.api.get<Paginated<AreaRow>>('/areas', { page: 1, page_size: 200 }).subscribe((r) => {
       this.areaOptions = r.items.map((a) => ({ value: a.id, label: a.name }));
       if (r.items.length) {
@@ -111,7 +124,7 @@ export class UserCreateDialogComponent implements OnInit {
     }
     this.loading = true;
     const v = this.form.getRawValue();
-    this.api.post('/users', v).subscribe({
+    this.api.post('/users', { ...v, status: 'active' }).subscribe({
       next: () => this.ref.close(true),
       error: () => (this.loading = false),
       complete: () => (this.loading = false),

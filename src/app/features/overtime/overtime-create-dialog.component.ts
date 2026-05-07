@@ -6,6 +6,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ApiService } from '../../core/services/api.service';
+import { dateToYmd } from '../../core/utils/date-api';
+import { DateFieldComponent } from '../../shared/date-field/date-field.component';
 import {
   SearchableSelectComponent,
   type SearchableOption,
@@ -27,6 +29,7 @@ interface EmployeeOpt {
     MatButtonModule,
     MatProgressSpinnerModule,
     SearchableSelectComponent,
+    DateFieldComponent,
   ],
   template: `
     <div class="em-dialog">
@@ -35,13 +38,11 @@ interface EmployeeOpt {
       <form [formGroup]="form" class="form">
         <em-searchable-select
           label="Empleado"
+          placeholder="Seleccione un empleado"
           [control]="form.controls.employee_id"
           [options]="employeeOptions"
         />
-        <mat-form-field appearance="outline" class="full">
-          <mat-label>Fecha</mat-label>
-          <input matInput type="date" formControlName="date" />
-        </mat-form-field>
+        <em-date-field label="Fecha" [control]="form.controls.date" />
         <mat-form-field appearance="outline" class="full">
           <mat-label>Horas</mat-label>
           <input matInput type="number" step="0.25" min="0.01" formControlName="hours" />
@@ -84,9 +85,9 @@ export class OvertimeCreateDialogComponent implements OnInit {
   employeeOptions: SearchableOption<number>[] = [];
   loading = false;
 
-  readonly form = this.fb.nonNullable.group({
-    employee_id: [0, [Validators.required, Validators.min(1)]],
-    date: ['', Validators.required],
+  readonly form = this.fb.group({
+    employee_id: [null as number | null, Validators.required],
+    date: [null as Date | null, Validators.required],
     hours: ['', Validators.required],
     justification: ['', Validators.required],
   });
@@ -94,9 +95,6 @@ export class OvertimeCreateDialogComponent implements OnInit {
   ngOnInit(): void {
     this.api.getAllPages<EmployeeOpt & { identification_number?: string }>('/employees').subscribe((items) => {
       this.employeeOptions = items.map((x) => ({ value: x.id, label: x.name }));
-      if (items.length) {
-        this.form.patchValue({ employee_id: items[0].id });
-      }
     });
   }
 
@@ -105,6 +103,9 @@ export class OvertimeCreateDialogComponent implements OnInit {
       return;
     }
     const v = this.form.getRawValue();
+    if (v.employee_id == null) {
+      return;
+    }
     const h = parseFloat(String(v.hours));
     if (Number.isNaN(h) || h <= 0) {
       return;
@@ -113,7 +114,7 @@ export class OvertimeCreateDialogComponent implements OnInit {
     this.api
       .post('/overtime-requests', {
         employee_id: v.employee_id,
-        date: v.date,
+        date: dateToYmd(v.date),
         hours: String(h),
         justification: v.justification,
       })

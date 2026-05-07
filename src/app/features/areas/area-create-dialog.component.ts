@@ -6,8 +6,6 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ApiService } from '../../core/services/api.service';
-import { SearchableSelectComponent } from '../../shared/searchable-select/searchable-select.component';
-import { ENTITY_STATUS_OPTIONS } from '../../shared/searchable-select/select-options';
 
 @Component({
   selector: 'em-area-create-dialog',
@@ -19,7 +17,6 @@ import { ENTITY_STATUS_OPTIONS } from '../../shared/searchable-select/select-opt
     MatInputModule,
     MatButtonModule,
     MatProgressSpinnerModule,
-    SearchableSelectComponent,
   ],
   template: `
     <div class="em-dialog">
@@ -30,11 +27,6 @@ import { ENTITY_STATUS_OPTIONS } from '../../shared/searchable-select/select-opt
           <mat-label>Nombre</mat-label>
           <input matInput formControlName="name" />
         </mat-form-field>
-        <em-searchable-select
-          label="Estado"
-          [control]="form.controls.status"
-          [options]="statusOptions"
-        />
       </form>
       </mat-dialog-content>
       <mat-dialog-actions align="start">
@@ -64,12 +56,10 @@ export class AreaCreateDialogComponent {
   private readonly api = inject(ApiService);
   readonly ref = inject(MatDialogRef<AreaCreateDialogComponent>);
 
-  readonly statusOptions = ENTITY_STATUS_OPTIONS;
   loading = false;
 
   readonly form = this.fb.nonNullable.group({
     name: ['', Validators.required],
-    status: ['active', Validators.required],
   });
 
   submit(): void {
@@ -77,7 +67,8 @@ export class AreaCreateDialogComponent {
       return;
     }
     this.loading = true;
-    this.api.post('/areas', this.form.getRawValue()).subscribe({
+    const { name } = this.form.getRawValue();
+    this.api.post('/areas', { name, status: 'active' }).subscribe({
       next: () => this.ref.close(true),
       error: () => (this.loading = false),
       complete: () => (this.loading = false),

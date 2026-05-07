@@ -1,4 +1,5 @@
 import { Component, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatDialog } from '@angular/material/dialog';
@@ -8,6 +9,8 @@ import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ApiService, Paginated } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
+import { RealtimeService } from '../../core/services/realtime.service';
+import { realtimeAffectsTable } from '../../core/utils/realtime-tables';
 import { TranslateLabelPipe } from '../../core/pipes/translate-label.pipe';
 import { AreaCreateDialogComponent } from './area-create-dialog.component';
 import { AreaEditDialogComponent } from './area-edit-dialog.component';
@@ -126,7 +129,16 @@ interface AreaRow {
 export class AreasComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly dialog = inject(MatDialog);
+  private readonly realtime = inject(RealtimeService);
   readonly auth = inject(AuthService);
+
+  constructor() {
+    this.realtime.dataChanged$.pipe(takeUntilDestroyed()).subscribe((msg) => {
+      if (realtimeAffectsTable(msg, 'areas')) {
+        this.load();
+      }
+    });
+  }
 
   rows: AreaRow[] = [];
   total = 0;

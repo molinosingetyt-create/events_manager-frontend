@@ -1,23 +1,26 @@
 /* Design tokens — Molinos del Atlántico / La Nieve (logo corporativo) */
 :root {
-  /* Marca */
-  --em-brand-navy: #1a2b6d;
-  --em-brand-navy-dark: #121e4d;
-  --em-brand-red: #e31e24;
-  --em-brand-gold: #d4a037;
-  --em-brand-green: #008c45;
+  --em-font-brand: 'Cooper Md BT', 'Cooper Black', Georgia, serif;
+  --em-font-secondary: Inter, 'Segoe UI', Roboto, Arial, sans-serif;
 
-  --em-bg: #f4f6fa;
+  /* Marca */
+  --em-brand-navy: #0066CC;
+  --em-brand-navy-dark: #103847;
+  --em-brand-red: #DD0A1E;
+  --em-brand-gold: #A37F3E;
+  --em-brand-green: #103847;
+
+  --em-bg: #ffffff;
   --em-surface: #ffffff;
-  --em-border: #e2e6ef;
-  --em-text: #161c2d;
-  --em-text-muted: #5c6578;
-  --em-primary-ghost: rgba(26, 43, 109, 0.08);
-  --em-primary-border: rgba(26, 43, 109, 0.22);
+  --em-border: #FCEDD9;
+  --em-text: #103847;
+  --em-text-muted: #103847;
+  --em-primary-ghost: rgba(0, 102, 204, 0.08);
+  --em-primary-border: rgba(0, 102, 204, 0.22);
   --em-radius: 12px;
   --em-radius-sm: 8px;
-  --em-shadow: 0 1px 3px rgba(26, 43, 109, 0.07);
-  --em-shadow-md: 0 4px 14px rgba(26, 43, 109, 0.09);
+  --em-shadow: 0 1px 3px rgba(0, 102, 204, 0.07);
+  --em-shadow-md: 0 4px 14px rgba(0, 102, 204, 0.09);
 }
 
 /*
@@ -27,28 +30,28 @@
 html {
   --mat-sys-primary: var(--em-brand-navy);
   --mat-sys-on-primary: #ffffff;
-  --mat-sys-primary-container: #dce2f5;
-  --mat-sys-on-primary-container: #0f1a4d;
-  --mat-sys-inverse-primary: #b4c4f0;
-  --mat-sys-primary-fixed: #dce2f5;
-  --mat-sys-primary-fixed-dim: #b4c4f0;
-  --mat-sys-on-primary-fixed: #0a1238;
-  --mat-sys-on-primary-fixed-variant: #1a2b6d;
+  --mat-sys-primary-container: #FCEFD9;
+  --mat-sys-on-primary-container: #103847;
+  --mat-sys-inverse-primary: #FCEFD9;
+  --mat-sys-primary-fixed: #FCEFD9;
+  --mat-sys-primary-fixed-dim: #FCEFD9;
+  --mat-sys-on-primary-fixed: #103847;
+  --mat-sys-on-primary-fixed-variant: #0066CC;
   --mat-sys-surface-tint: var(--em-brand-navy);
 
   --mat-sys-tertiary: var(--em-brand-gold);
   --mat-sys-on-tertiary: #ffffff;
-  --mat-sys-tertiary-container: #f6e9c8;
-  --mat-sys-on-tertiary-container: #4a3700;
-  --mat-sys-tertiary-fixed: #f6e9c8;
-  --mat-sys-tertiary-fixed-dim: #e3cf9a;
-  --mat-sys-on-tertiary-fixed: #2c2100;
-  --mat-sys-on-tertiary-fixed-variant: #5c4500;
+  --mat-sys-tertiary-container: #E9C04C;
+  --mat-sys-on-tertiary-container: #A37F3E;
+  --mat-sys-tertiary-fixed: #E9C04C;
+  --mat-sys-tertiary-fixed-dim: #E9C04C;
+  --mat-sys-on-tertiary-fixed: #A37F3E;
+  --mat-sys-on-tertiary-fixed-variant: #A37F3E;
 
   --mat-sys-error: var(--em-brand-red);
   --mat-sys-on-error: #ffffff;
-  --mat-sys-error-container: #ffdad4;
-  --mat-sys-on-error-container: #93000a;
+  --mat-sys-error-container: #FCEFD9;
+  --mat-sys-on-error-container: #C7272D;
 }
 
 html,
@@ -58,46 +61,48 @@ body {
 
 body {
   margin: 0;
-  font-family: 'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif;
+  font-family: var(--em-font-secondary);
   font-size: 15px;
   line-height: 1.5;
   color: var(--em-text);
-  background: var(--em-bg);
+  background: #ffffff;
   -webkit-font-smoothing: antialiased;
 }
 
 h1,
 h2,
 h3 {
+  font-family: var(--em-font-secondary);
   font-weight: 600;
   letter-spacing: -0.02em;
 }
 
 /* Contenido principal (dentro del shell) */
 .shell-content {
-  min-height: calc(100vh - 64px);
-  background: var(--em-bg);
+  min-height: 100vh;
+  background: #ffffff;
 }
 
 .shell-content .content {
-  padding: 1.25rem 1.25rem 2rem;
-  max-width: 1280px;
-  margin: 0 auto;
+  padding: 1.15rem 1.35rem 2rem;
+  max-width: none;
+  margin: 0;
 }
 
 @media (min-width: 960px) {
   .shell-content .content {
-    padding: 1.5rem 1.75rem 2.5rem;
+    padding: 1.15rem 1.35rem 2rem;
   }
 }
 
 /* Títulos de página */
 .content h1 {
-  font-size: 1.625rem;
+  font-size: 1.45rem;
   font-weight: 700;
   color: var(--em-text);
   margin: 0 0 0.35rem;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
 }
 
 .content .page-lead,
@@ -131,13 +136,18 @@ h3 {
 
 .page-head .actions {
   flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
 }
 
 /* Tarjetas Material en contenido */
 .content .mat-mdc-card {
   border-radius: var(--em-radius);
-  border: 1px solid var(--em-border);
-  box-shadow: var(--em-shadow);
+  border: 1px solid rgba(16, 56, 71, 0.08);
+  box-shadow: 0 2px 10px rgba(16, 56, 71, 0.05);
   background: var(--em-surface);
   overflow: hidden;
 }
@@ -162,7 +172,7 @@ h3 {
 }
 
 .content .mat-mdc-header-row {
-  background: rgba(26, 43, 109, 0.04);
+  background: rgba(0, 102, 204, 0.04);
 }
 
 .content .mat-mdc-header-cell {
@@ -180,13 +190,13 @@ h3 {
 }
 
 .content .mat-mdc-row:hover {
-  background: rgba(26, 43, 109, 0.04);
+  background: rgba(0, 102, 204, 0.04);
 }
 
 /* Paginador */
 .content .mat-mdc-paginator {
   border-top: 1px solid var(--em-border);
-  background: #fafbfc;
+  background: #ffffff;
   border-radius: 0 0 var(--em-radius-sm) var(--em-radius-sm);
 }
 
@@ -197,8 +207,9 @@ h3 {
   flex-wrap: nowrap;
   align-items: center;
   justify-content: flex-start;
-  gap: 0.2rem;
+  gap: 0.5rem;
   vertical-align: middle;
+  padding: 0.125rem 0;
 }
 
 .action-row .mat-mdc-icon-button {
@@ -341,7 +352,7 @@ button:focus-visible,
   justify-content: flex-end;
 }
 
-/* Iconos de acción en tablas — marca */
+/* Iconos de acción en tablas — marca (misma lectura que Usuarios) */
 .action-btn-view mat-icon {
   color: var(--em-brand-navy);
 }
@@ -352,6 +363,28 @@ button:focus-visible,
 
 .action-btn-delete mat-icon {
   color: var(--em-brand-red);
+}
+
+/* Fondo suave al pasar el foco/hover (icon-button y enlaces tipo icon-button) */
+.action-btn-view.mat-mdc-icon-button:hover,
+.action-btn-view.mat-mdc-icon-button:focus-visible,
+a.action-btn-view.mat-mdc-icon-button:hover,
+a.action-btn-view.mat-mdc-icon-button:focus-visible {
+  background-color: var(--em-primary-ghost);
+}
+
+.action-btn-edit.mat-mdc-icon-button:hover,
+.action-btn-edit.mat-mdc-icon-button:focus-visible,
+a.action-btn-edit.mat-mdc-icon-button:hover,
+a.action-btn-edit.mat-mdc-icon-button:focus-visible {
+  background-color: rgba(163, 127, 62, 0.14);
+}
+
+.action-btn-delete.mat-mdc-icon-button:hover,
+.action-btn-delete.mat-mdc-icon-button:focus-visible,
+a.action-btn-delete.mat-mdc-icon-button:hover,
+a.action-btn-delete.mat-mdc-icon-button:focus-visible {
+  background-color: rgba(221, 10, 30, 0.1);
 }
 
 /* Menú de notificaciones (overlay fuera del shell) */

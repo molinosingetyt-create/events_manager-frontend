@@ -1,4 +1,5 @@
 import { Component, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatDialog } from '@angular/material/dialog';
@@ -8,6 +9,8 @@ import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ApiService, Paginated } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
+import { RealtimeService } from '../../core/services/realtime.service';
+import { realtimeAffectsTable } from '../../core/utils/realtime-tables';
 import type { User } from '../../core/models/user';
 import { TranslateLabelPipe } from '../../core/pipes/translate-label.pipe';
 import { UserCreateDialogComponent } from './user-create-dialog.component';
@@ -123,7 +126,16 @@ import { UserViewDialogComponent } from './user-view-dialog.component';
 export class UsersComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly dialog = inject(MatDialog);
+  private readonly realtime = inject(RealtimeService);
   readonly auth = inject(AuthService);
+
+  constructor() {
+    this.realtime.dataChanged$.pipe(takeUntilDestroyed()).subscribe((msg) => {
+      if (realtimeAffectsTable(msg, 'users')) {
+        this.load();
+      }
+    });
+  }
 
   rows: User[] = [];
   total = 0;

@@ -1,5 +1,6 @@
 import { NgClass } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatDialog } from '@angular/material/dialog';
@@ -7,8 +8,11 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { LABELS } from '../../core/i18n/labels';
 import { ApiService, Paginated } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
+import { RealtimeService } from '../../core/services/realtime.service';
+import { realtimeAffectsTable } from '../../core/utils/realtime-tables';
 import { TranslateLabelPipe } from '../../core/pipes/translate-label.pipe';
 import { OvertimeCreateDialogComponent } from './overtime-create-dialog.component';
 import { OvertimeDecisionDialogComponent } from './overtime-decision-dialog.component';
@@ -49,15 +53,19 @@ interface OvertimeListRow {
   template: `
     <div class="page-head">
       <h1>Solicitudes de horas extra</h1>
-      @if (auth.hasAnyRole(['ADMIN', 'HR', 'MANAGEMENT', 'LEADER'])) {
-        <div class="actions">
+      <div class="actions">
+        <button mat-stroked-button type="button" [disabled]="exporting" (click)="downloadExcel()">
+          <mat-icon>download</mat-icon>
+          {{ exporting ? 'Generando…' : 'Descargar Excel' }}
+        </button>
+        @if (auth.hasAnyRole(['ADMIN', 'HR', 'MANAGEMENT', 'LEADER'])) {
           <button mat-flat-button color="primary" type="button" (click)="openCreate()">
             <mat-icon>add</mat-icon>
             Nueva solicitud
           </button>
-        </div>
-      }
-      <p class="page-lead">La aprobación o rechazo final lo realizan <strong>gerencia</strong> o <strong>administración</strong>.</p>
+        }
+      </div>
+      <p class="page-lead">La aprobación o rechazo final lo realizan <strong>gerencia</strong>.</p>
     </div>
     <mat-card>
       <mat-card-content class="table-scroll">
@@ -165,36 +173,46 @@ interface OvertimeListRow {
     }
     /* Tonos pastel “nieve”: suaves y legibles sobre fila blanca */
     .em-status-pill--pending {
-      background: #fffbeb;
-      color: #a16207;
-      border-color: #fde68a;
+      background: #FCEDD9;
+      color: #A37F3E;
+      border-color: #E9C04C;
     }
     .em-status-pill--rejected {
-      background: #fef2f2;
-      color: #b91c1c;
-      border-color: #fecaca;
+      background: #FCEFD9;
+      color: #C7272D;
+      border-color: #FCEFD9;
     }
     .em-status-pill--approved {
       background: #f0fdf4;
-      color: #047857;
-      border-color: #bbf7d0;
+      color: #103847;
+      border-color: #FCEFD9;
     }
     .em-status-pill--default {
-      background: #f9fafb;
-      color: #4b5563;
-      border-color: #e5e7eb;
+      background: #FCEDD9;
+      color: #103847;
+      border-color: #FCEDD9;
     }
   `,
 })
 export class OvertimeComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly dialog = inject(MatDialog);
+  private readonly realtime = inject(RealtimeService);
   readonly auth = inject(AuthService);
+
+  constructor() {
+    this.realtime.dataChanged$.pipe(takeUntilDestroyed()).subscribe((msg) => {
+      if (realtimeAffectsTable(msg, 'overtime')) {
+        this.load();
+      }
+    });
+  }
 
   rows: OvertimeListRow[] = [];
   total = 0;
   page = 1;
   pageSize = 20;
+  exporting = false;
 
   readonly tableColumns = ['id', 'employee', 'date', 'hours', 'status', 'actions'];
 
@@ -218,6 +236,43 @@ export class OvertimeComponent implements OnInit {
     this.dialog.open(OvertimeViewDialogComponent, {
       width: 'min(96vw, 560px)',
       data: requestId,
+    });
+  }
+
+  downloadExcel(): void {
+    if (this.exporting) {
+      return;
+    }
+    this.exporting = true;
+    this.api.getAllPages<OvertimeListRow>('/overtime-requests').subscribe({
+      next: async (items) => {
+        try {
+          const { downloadExcelFile } = await import('../../core/utils/excel-download');
+          const statusMap = LABELS.entityStatus as Record<string, string>;
+          const rows = items.map((r) => ({
+            ID: r.id,
+            Empleado: r.employee_name,
+            Fecha: r.date,
+            Horas: r.hours,
+            Estado: statusMap[r.status] ?? r.status,
+            Justificación: r.justification,
+            Solicitante: r.requester?.name ?? '',
+            'Correo solicitante': r.requester?.email ?? '',
+            Aprobador: r.approver?.name ?? '',
+            'Correo aprobador': r.approver?.email ?? '',
+            'Comentario de decisión': r.approval_comment?.trim() ? r.approval_comment : '',
+            'Creado': r.created_at,
+            'Actualizado': r.updated_at,
+          }));
+          const stamp = new Date().toISOString().slice(0, 10);
+          await downloadExcelFile(rows, `horas_extra_${stamp}.xlsx`, 'Horas extra');
+        } finally {
+          this.exporting = false;
+        }
+      },
+      error: () => {
+        this.exporting = false;
+      },
     });
   }
 

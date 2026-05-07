@@ -15,6 +15,8 @@ interface EmployeeRead {
   area_name: string;
   leader_id: number | null;
   leader_name: string | null;
+  temporal_category_id: number | null;
+  temporal_category_name: string;
   status: string;
   created_at: string;
   updated_at: string;
@@ -53,6 +55,10 @@ interface EmployeeRead {
           <p class="detail-line">
             <span class="detail-label">Área:</span>
             <span class="detail-value">{{ emp.area_name || ('#' + emp.area_id) }}</span>
+          </p>
+          <p class="detail-line">
+            <span class="detail-label">Temporal:</span>
+            <span class="detail-value">{{ emp.temporal_category_name || '—' }}</span>
           </p>
           <p class="detail-line">
             <span class="detail-label">Líder:</span>

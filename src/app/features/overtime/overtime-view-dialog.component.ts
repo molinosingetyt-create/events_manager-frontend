@@ -173,7 +173,7 @@ export interface OvertimeRequestDetail {
     .hist-head-right {
       flex: 0 0 auto;
       font-size: 0.875rem;
-      color: var(--em-text-muted, #64748b);
+      color: var(--em-text-muted, #103847);
       white-space: nowrap;
     }
     .hist-name {
@@ -182,13 +182,13 @@ export interface OvertimeRequestDetail {
     .hist-sub {
       margin-top: 0.45rem;
       padding-left: 1.75rem;
-      border-left: 2px solid #e2e8f0;
+      border-left: 2px solid #FCEDD9;
       margin-left: 0.15rem;
     }
     .hist-sub-line {
       font-size: 0.9rem;
       line-height: 1.5;
-      color: var(--em-text, #0f172a);
+      color: var(--em-text, #103847);
       white-space: pre-wrap;
     }
   `,

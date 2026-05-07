@@ -15,8 +15,15 @@ export const LABELS = {
     rejected: 'Rechazado',
   },
   incapacityType: {
-    incapacity: 'Incapacidad',
-    note: 'Nota',
+    general_illness: 'Enfermedad general',
+    work_accident: 'Accidente de trabajo',
+    /** Valores antiguos (histórico / Excel) */
+    incapacity: 'Enfermedad general',
+    note: 'Accidente de trabajo',
+  },
+  longAbsenceDocumentKind: {
+    historia_clinica: 'Historia clínica',
+    incapacidad_eps: 'Incapacidad transcrita por EPS',
   },
   overtimeHistoryAction: {
     created: 'Solicitud creada',
