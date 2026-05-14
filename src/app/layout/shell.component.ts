@@ -117,6 +117,12 @@ import { TranslateLabelPipe } from '../core/pipes/translate-label.pipe';
               <span matListItemTitle>Empleados</span>
             </a>
           }
+          @if (auth.hasAnyPermission(['employees.org_chart'])) {
+            <a mat-list-item routerLink="/app/organigrama" routerLinkActive="active">
+              <mat-icon matListItemIcon>account_tree</mat-icon>
+              <span matListItemTitle>Organigrama</span>
+            </a>
+          }
           @if (auth.hasPermissionInNamespace('overtime')) {
             <a mat-list-item routerLink="/app/overtime" routerLinkActive="active">
               <mat-icon matListItemIcon>schedule</mat-icon>

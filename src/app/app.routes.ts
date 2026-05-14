@@ -7,6 +7,7 @@ import { EmployeesComponent } from './features/employees/employees.component';
 import { IncapacityComponent } from './features/incapacity/incapacity.component';
 import { LoginComponent } from './features/login/login.component';
 import { OvertimeComponent } from './features/overtime/overtime.component';
+import { OrgChartComponent } from './features/org-chart/org-chart.component';
 import { UsersComponent } from './features/users/users.component';
 import { ShellComponent } from './layout/shell.component';
 
@@ -37,6 +38,12 @@ export const routes: Routes = [
         component: EmployeesComponent,
         canActivate: [permissionsGuard],
         data: { permissionNamespaces: ['employees'] },
+      },
+      {
+        path: 'organigrama',
+        component: OrgChartComponent,
+        canActivate: [permissionsGuard],
+        data: { anyPermissions: ['employees.org_chart'] },
       },
       {
         path: 'overtime',
