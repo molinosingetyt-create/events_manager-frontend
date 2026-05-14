@@ -1,5 +1,5 @@
-const host = window.location.hostname;
-const apiPort = 8001;
+const host = '44.197.169.240';
+const apiPort = 8000;
 const httpOrigin = `http://${host}:${apiPort}`;
 
 export const environment = {

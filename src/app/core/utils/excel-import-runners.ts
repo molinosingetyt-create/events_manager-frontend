@@ -100,10 +100,14 @@ interface UserAreaRow extends IdNameRow {
   role?: string;
 }
 
-/** Si `allUsers` está definido (solo admin en import), acepta cualquier usuario activo del área del empleado. */
+/**
+ * Si `allUsers` está definido (solo admin en import): resuelve líder entre todos los usuarios
+ * activos (sin exigir que coincida el área del empleado). Los ids numéricos se envían tal cual
+ * para que el backend valide.
+ */
 function resolveLeaderForEmployeeRow(
   raw: unknown,
-  areaId: number,
+  _areaId: number,
   activeLeaders: IdNameRow[],
   leaderByName: Map<string, number>,
   allUsers: UserAreaRow[] | null,
@@ -113,27 +117,23 @@ function resolveLeaderForEmployeeRow(
     if (!s) {
       return null;
     }
-    const activeInArea = allUsers.filter((u) => isActiveRow(u) && u.area_id === areaId);
-    const byId = new Map(activeInArea.map((u) => [u.id, u] as const));
+    const activeUsers = allUsers.filter(isActiveRow);
     const trimmed = s.trim();
     if (/^\d+$/.test(trimmed)) {
-      const id = parseInt(trimmed, 10);
-      if (byId.has(id)) {
-        return id;
-      }
+      return parseInt(trimmed, 10);
     }
     const k = normalizeLookupKey(s);
-    const matches = activeInArea.filter((u) => normalizeLookupKey(u.name) === k);
+    const matches = activeUsers.filter((u) => normalizeLookupKey(u.name) === k);
     if (matches.length === 1) {
       return matches[0].id;
     }
     if (matches.length > 1) {
       throw new Error(
-        `Varios usuarios activos en el área coinciden con «${s}». Use el id numérico o un nombre más específico.`,
+        `Varios usuarios activos coinciden con «${s}». Use el id numérico o un nombre más específico.`,
       );
     }
     throw new Error(
-      `Usuario no reconocido en el área del empleado: «${s}». Debe ser un usuario activo de esa área.`,
+      `Usuario no reconocido: «${s}». Use el id numérico o el nombre tal como está en el sistema.`,
     );
   }
   return resolveLeaderId(raw, activeLeaders, leaderByName);

@@ -139,8 +139,11 @@ export class EmployeeCreateDialogComponent implements OnInit {
   }
 
   private loadLeadersForArea(areaId: number): void {
-    const params: Record<string, string | number> = { area_id: areaId };
-    if (!this.auth.hasRole('ADMIN')) {
+    const params: Record<string, string | number> = {};
+    if (this.auth.hasRole('ADMIN')) {
+      // Admin: sin filtro por área del empleado.
+    } else {
+      params['area_id'] = areaId;
       params['role'] = 'LEADER';
     }
     this.api.getAllPages<{ id: number; name: string }>('/users', params).subscribe({
