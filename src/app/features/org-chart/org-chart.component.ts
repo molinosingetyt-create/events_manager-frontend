@@ -105,16 +105,23 @@ interface OrgChartPayload {
             } @else if (node.children && node.children.length > 1) {
               <div class="oc-tree oc-tree--multi">
                 <div class="oc-trunk"></div>
-                <div class="oc-shelf">
-                  <div class="oc-hbar" aria-hidden="true"></div>
-                  <div class="oc-row">
-                    @for (c of node.children; track trackNode(c)) {
-                      <div class="oc-col">
-                        <div class="oc-drop" aria-hidden="true"></div>
-                        <ng-container *ngTemplateOutlet="branch; context: { node: c, depth: depth + 1 }" />
-                      </div>
+                <div class="oc-multi-shelves">
+                  @for (peerRow of chunkPeers(node.children); track peerRowTrack(peerRow, $index)) {
+                    @if ($index > 0) {
+                      <div class="oc-trunk oc-trunk--chunk-join" aria-hidden="true"></div>
                     }
-                  </div>
+                    <div class="oc-shelf">
+                      <div class="oc-hbar" aria-hidden="true"></div>
+                      <div class="oc-row">
+                        @for (c of peerRow; track trackNode(c)) {
+                          <div class="oc-col">
+                            <div class="oc-drop" aria-hidden="true"></div>
+                            <ng-container *ngTemplateOutlet="branch; context: { node: c, depth: depth + 1 }" />
+                          </div>
+                        }
+                      </div>
+                    </div>
+                  }
                 </div>
               </div>
             }
@@ -186,21 +193,31 @@ interface OrgChartPayload {
         @if (data()!.unassigned.length) {
           <section class="oc-unassigned">
             <h2 class="oc-unassigned-kicker">Sin líder asignado</h2>
-            <p class="oc-unassigned-lead">Colaboradores registrados sin usuario líder</p>
-            <div class="oc-unassigned-grid">
-              @for (m of data()!.unassigned; track m.id) {
-                <div class="oc-node oc-node--secondary oc-node--tile">
-                  <div class="oc-avatar oc-avatar--sm" [attr.aria-label]="'Avatar ' + m.name">
-                    <span class="oc-avatar-text">{{ initials(m.name) }}</span>
+            <p class="oc-unassigned-lead">
+              Colaboradores registrados sin usuario líder. Orden: Socios → Gerencia → demás. Máximo
+              {{ maxPeersPerRow }} por fila; el resto continúa debajo del mismo bloque.
+            </p>
+            @for (block of unassignedSections(); track block.key) {
+              <div class="oc-unassigned-block">
+                <h3 class="oc-unassigned-block-title">{{ block.title }}</h3>
+                @for (row of chunkMembers(block.items); track rowTrack(row, $index)) {
+                  <div class="oc-unassigned-row">
+                    @for (m of row; track m.id) {
+                      <div class="oc-node oc-node--secondary oc-node--tile">
+                        <div class="oc-avatar oc-avatar--sm" [attr.aria-label]="'Avatar ' + m.name">
+                          <span class="oc-avatar-text">{{ initials(m.name) }}</span>
+                        </div>
+                        <p class="oc-role oc-role--sm">{{ roleUpper(m.position) }}</p>
+                        <p class="oc-name oc-name--sm">{{ m.name }}</p>
+                        @if (m.area_name) {
+                          <p class="oc-area">{{ m.area_name }}</p>
+                        }
+                      </div>
+                    }
                   </div>
-                  <p class="oc-role oc-role--sm">{{ roleUpper(m.position) }}</p>
-                  <p class="oc-name oc-name--sm">{{ m.name }}</p>
-                  @if (m.area_name) {
-                    <p class="oc-area">{{ m.area_name }}</p>
-                  }
-                </div>
-              }
-            </div>
+                }
+              </div>
+            }
           </section>
         }
       }
@@ -310,7 +327,7 @@ interface OrgChartPayload {
       display: inline-block;
       transform-origin: 0 0;
       will-change: transform;
-      padding: 2.5rem 3rem 3rem;
+      padding: 1.75rem 2rem 2.25rem;
     }
     .oc-spider {
       display: flex;
@@ -377,10 +394,10 @@ interface OrgChartPayload {
       align-items: center;
       text-align: center;
       width: max-content;
-      max-width: min(22rem, 92vw);
+      max-width: min(19rem, 90vw);
       min-width: 0;
       box-sizing: border-box;
-      padding-inline: 0.5rem;
+      padding-inline: 0.35rem;
     }
     .oc-node--tile {
       padding: 0.35rem 0.25rem;
@@ -469,6 +486,12 @@ interface OrgChartPayload {
       width: max-content;
       max-width: none;
     }
+    .oc-multi-shelves {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+    }
     .oc-tree--single {
       align-items: center;
     }
@@ -481,6 +504,10 @@ interface OrgChartPayload {
     }
     .oc-trunk--long {
       height: 34px;
+    }
+    .oc-trunk--chunk-join {
+      height: 14px;
+      margin: 0;
     }
     .oc-shelf {
       position: relative;
@@ -504,8 +531,8 @@ interface OrgChartPayload {
       flex-wrap: nowrap;
       justify-content: center;
       align-items: flex-start;
-      column-gap: clamp(2.5rem, 4.5vw, 5rem);
-      row-gap: 1.5rem;
+      column-gap: clamp(0.85rem, 1.8vw, 2.25rem);
+      row-gap: 1rem;
       padding: 0;
       width: max-content;
       max-width: none;
@@ -517,9 +544,9 @@ interface OrgChartPayload {
       align-items: center;
       flex: 0 0 auto;
       width: max-content;
-      min-width: 10.5rem;
+      min-width: 9.25rem;
       max-width: none;
-      padding: 0 clamp(0.85rem, 2vw, 1.85rem);
+      padding: 0 clamp(0.45rem, 1.2vw, 1rem);
       box-sizing: border-box;
     }
     .oc-drop {
@@ -530,10 +557,10 @@ interface OrgChartPayload {
       flex-shrink: 0;
     }
     .oc-unassigned {
-      margin-top: 2.25rem;
-      padding: 2rem 1rem 0;
+      margin-top: 1.75rem;
+      padding: 1.5rem 0.75rem 0;
       border-top: 1px solid rgba(10, 10, 10, 0.12);
-      max-width: 960px;
+      max-width: 1100px;
       margin-left: auto;
       margin-right: auto;
     }
@@ -547,16 +574,39 @@ interface OrgChartPayload {
       color: #0a0a0a;
     }
     .oc-unassigned-lead {
-      margin: 0 0 1.25rem;
+      margin: 0 0 1rem;
       text-align: center;
-      font-size: 0.8rem;
+      font-size: 0.76rem;
       color: rgba(10, 10, 10, 0.5);
+      line-height: 1.45;
+      max-width: 40rem;
+      margin-left: auto;
+      margin-right: auto;
     }
-    .oc-unassigned-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(7.25rem, 1fr));
-      gap: 1.15rem 0.85rem;
-      justify-items: center;
+    .oc-unassigned-block {
+      margin-bottom: 1.35rem;
+    }
+    .oc-unassigned-block-title {
+      margin: 0 0 0.65rem;
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: #0066cc;
+      text-align: center;
+    }
+    .oc-unassigned-row {
+      display: flex;
+      flex-wrap: nowrap;
+      justify-content: center;
+      align-items: flex-start;
+      gap: clamp(0.75rem, 1.5vw, 1.75rem);
+      margin-bottom: 0.65rem;
+      width: 100%;
+      max-width: 100%;
+    }
+    .oc-unassigned-row:last-child {
+      margin-bottom: 0;
     }
   `,
 })
@@ -581,6 +631,33 @@ export class OrgChartComponent implements OnInit {
     () => `translate(${this.panX()}px, ${this.panY()}px) scale(${this.zoom()})`,
   );
   readonly zoomPercent = computed(() => Math.round(this.zoom() * 100));
+
+  /** Máximo de personas por fila bajo el mismo líder o en “sin líder” (5–6). */
+  readonly maxPeersPerRow = 6;
+
+  /** Sin líder: Socios → Gerencia → resto (según texto del cargo). */
+  readonly unassignedSections = computed(() => {
+    const raw = this.data()?.unassigned ?? [];
+    const byName = (a: OrgChartMember, b: OrgChartMember) =>
+      a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
+    const socios = raw.filter((m) => /\bsocios?\b/i.test(m.position)).sort(byName);
+    const ger = raw
+      .filter((m) => /\bgerencia\b/i.test(m.position) && !/\bsocios?\b/i.test(m.position))
+      .sort(byName);
+    const used = new Set<number>([...socios, ...ger].map((x) => x.id));
+    const otros = raw.filter((m) => !used.has(m.id)).sort(byName);
+    const out: { key: string; title: string; items: OrgChartMember[] }[] = [];
+    if (socios.length) {
+      out.push({ key: 'socios', title: 'Socios', items: socios });
+    }
+    if (ger.length) {
+      out.push({ key: 'gerencia', title: 'Gerencia', items: ger });
+    }
+    if (otros.length) {
+      out.push({ key: 'otros', title: 'Colaboradores', items: otros });
+    }
+    return out;
+  });
 
   ngOnInit(): void {
     this.api.get<OrgChartPayload>('/employees/org-chart').subscribe({
@@ -682,5 +759,33 @@ export class OrgChartComponent implements OnInit {
 
   roleUpper(label: string): string {
     return (label || '').toUpperCase();
+  }
+
+  chunkPeers(nodes: OrgChartNode[] | null | undefined): OrgChartNode[][] {
+    return this.chunkList(nodes ?? [], this.maxPeersPerRow);
+  }
+
+  chunkMembers(items: OrgChartMember[]): OrgChartMember[][] {
+    return this.chunkList(items, this.maxPeersPerRow);
+  }
+
+  peerRowTrack(row: OrgChartNode[], idx: number): string {
+    return `p-${idx}-${row.map((x) => this.trackNode(x)).join('|')}`;
+  }
+
+  rowTrack(row: OrgChartMember[], idx: number): string {
+    return `m-${idx}-${row.map((x) => x.id).join('-')}`;
+  }
+
+  private chunkList<T>(arr: T[], size: number): T[][] {
+    if (!arr.length) {
+      return [];
+    }
+    const n = Math.max(1, Math.min(6, size));
+    const out: T[][] = [];
+    for (let i = 0; i < arr.length; i += n) {
+      out.push(arr.slice(i, i + n));
+    }
+    return out;
   }
 }
