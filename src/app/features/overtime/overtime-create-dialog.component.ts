@@ -5,7 +5,9 @@ import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { Observable, map, of } from 'rxjs';
 import { ApiService } from '../../core/services/api.service';
+import { AuthService } from '../../core/services/auth.service';
 import { dateToYmd } from '../../core/utils/date-api';
 import { DateFieldComponent } from '../../shared/date-field/date-field.component';
 import {
@@ -14,6 +16,12 @@ import {
 } from '../../shared/searchable-select/searchable-select.component';
 
 interface EmployeeOpt {
+  id: number;
+  name: string;
+  leader_id: number | null;
+}
+
+interface LeaderOption {
   id: number;
   name: string;
 }
@@ -80,6 +88,7 @@ interface EmployeeOpt {
 export class OvertimeCreateDialogComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly api = inject(ApiService);
+  private readonly auth = inject(AuthService);
   readonly ref = inject(MatDialogRef<OvertimeCreateDialogComponent>);
 
   employeeOptions: SearchableOption<number>[] = [];
@@ -93,9 +102,45 @@ export class OvertimeCreateDialogComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    this.api.getAllPages<EmployeeOpt & { identification_number?: string }>('/employees').subscribe((items) => {
-      this.employeeOptions = items.map((x) => ({ value: x.id, label: x.name }));
+    this.resolveLeaderIdsForCurrentUser().subscribe((leaderIds) => {
+      const params: Record<string, string | number> = {};
+      if (leaderIds?.length === 1) {
+        params['leader_id'] = leaderIds[0];
+      }
+      this.api
+        .getAllPages<EmployeeOpt & { identification_number?: string }>('/employees', params)
+        .subscribe((items) => {
+          const scoped =
+            leaderIds?.length ? items.filter((e) => e.leader_id != null && leaderIds.includes(e.leader_id)) : items;
+          this.employeeOptions = scoped.map((x) => ({ value: x.id, label: x.name }));
+        });
     });
+  }
+
+  /**
+   * Ids de líder cuyos empleados puede solicitar el usuario.
+   * `null` = sin filtro (p. ej. administrador).
+   */
+  private resolveLeaderIdsForCurrentUser(): Observable<number[] | null> {
+    if (this.auth.hasRole('ADMIN')) {
+      return of(null);
+    }
+    const u = this.auth.user();
+    if (!u) {
+      return of(null);
+    }
+    if (this.auth.hasRole('LEADER')) {
+      return of([u.id]);
+    }
+    if (u.leader_id != null && u.leader_id > 0) {
+      return of([u.leader_id]);
+    }
+    return this.api.get<LeaderOption[]>('/incapacity-notes/leader-filter-options').pipe(
+      map((opts) => {
+        const ids = (opts ?? []).map((o) => o.id).filter((id) => id > 0);
+        return ids.length ? ids : null;
+      }),
+    );
   }
 
   submit(): void {

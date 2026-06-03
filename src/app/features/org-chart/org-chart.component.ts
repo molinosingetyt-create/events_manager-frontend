@@ -1,43 +1,36 @@
 import { NgTemplateOutlet } from '@angular/common';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, ElementRef, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDialog } from '@angular/material/dialog';
+import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
+import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ApiService } from '../../core/services/api.service';
+import { AuthService } from '../../core/services/auth.service';
+import { OrgChartReassignDialogComponent } from './org-chart-reassign-dialog.component';
 import { OrgChartShelfHbarDirective } from './org-chart-shelf-hbar.directive';
-
-type OrgChartNodeKind = 'group' | 'user' | 'employee';
-
-interface OrgChartNode {
-  kind: OrgChartNodeKind;
-  user_id: number | null;
-  employee_id: number | null;
-  name: string;
-  position_label: string;
-  area_name: string;
-  children: OrgChartNode[];
-}
-
-interface OrgChartMember {
-  id: number;
-  name: string;
-  position: string;
-  area_name: string;
-}
-
-interface OrgChartPayload {
-  roots: OrgChartNode[];
-  unassigned: OrgChartMember[];
-}
+import type { OrgChartMember, OrgChartNode, OrgChartPayload, OrgChartReassignTarget } from './org-chart.types';
+import {
+  collectOrgChartPeople,
+  personMatchesQuery,
+  trackKeyForMember,
+  trackKeyForNode,
+  type OrgChartPersonRef,
+} from './org-chart.utils';
 
 @Component({
   selector: 'em-org-chart',
   standalone: true,
   imports: [
     NgTemplateOutlet,
+    FormsModule,
     MatButtonModule,
+    MatFormFieldModule,
+    MatInputModule,
     MatIconModule,
     MatProgressSpinnerModule,
     MatSnackBarModule,
@@ -50,9 +43,61 @@ interface OrgChartPayload {
         <p class="oc-hero-kicker">Organigrama</p>
         <h1 class="oc-hero-brand">Molinos del Atlántico</h1>
         <p class="oc-hero-sub">
-          Vista en árbol desde gerencia. Colaboradores del mismo líder se muestran en fila. Use la barra de zoom,
-          <strong>Ctrl + rueda del ratón</strong> o arrastre con el botón principal para moverse.
+          Los <strong>líderes</strong> del mismo nivel se muestran en una sola fila horizontal. Los
+          <strong>colaboradores</strong> bajo un mismo líder se reparten en <strong>filas de hasta 5</strong>. Zoom:
+          <strong>Ctrl + rueda</strong>; arrastre para mover el lienzo.
         </p>
+        <div class="oc-search-bar">
+          <mat-form-field appearance="outline" class="oc-search-field">
+            <mat-label>Buscar por nombre o cargo</mat-label>
+            <input
+              matInput
+              type="search"
+              [(ngModel)]="searchText"
+              (ngModelChange)="onSearchChange()"
+              placeholder="Ej. García, coordinador…"
+            />
+            @if (searchText) {
+              <button
+                mat-icon-button
+                matSuffix
+                type="button"
+                aria-label="Limpiar búsqueda"
+                (click)="clearSearch()"
+              >
+                <mat-icon>close</mat-icon>
+              </button>
+            }
+          </mat-form-field>
+          @if (searchActive()) {
+            @if (searchResults().length === 0) {
+              <p class="oc-search-empty">Sin coincidencias</p>
+            } @else if (searchResults().length === 1) {
+              <span class="oc-search-count">1 coincidencia — ubicando en el organigrama…</span>
+            } @else {
+              <div class="oc-search-picks">
+                <p class="oc-search-picks-title">
+                  {{ searchResults().length }} coincidencias — elija para ubicar en el organigrama:
+                </p>
+                <div class="oc-search-picks-list" role="listbox" aria-label="Coincidencias de búsqueda">
+                  @for (r of searchResults(); track r.key) {
+                    <button
+                      type="button"
+                      class="oc-search-pick"
+                      role="option"
+                      [class.oc-search-pick--active]="focusedKey() === r.key"
+                      [attr.aria-selected]="focusedKey() === r.key"
+                      (click)="focusPerson(r.key)"
+                    >
+                      <span class="oc-search-pick-name">{{ r.name }}</span>
+                      <span class="oc-search-pick-meta">{{ r.position }}@if (r.areaName) { · {{ r.areaName }} }</span>
+                    </button>
+                  }
+                </div>
+              </div>
+            }
+          }
+        </div>
       </header>
 
       <ng-template #branch let-node="node" let-depth="depth">
@@ -78,9 +123,13 @@ interface OrgChartPayload {
           >
             <div
               class="oc-node"
+              [attr.data-oc-key]="node.kind === 'group' ? null : trackKeyForNode(node)"
               [class.oc-node--root]="depth === 0"
               [class.oc-node--mid]="depth === 1"
               [class.oc-node--leaf]="depth >= 2"
+              [class.oc-node--match]="nodeMatchesSearch(node)"
+              [class.oc-node--dim]="nodeDimmed(node)"
+              [class.oc-node--focused]="focusedKey() === trackKeyForNode(node)"
             >
               <div
                 class="oc-avatar"
@@ -95,6 +144,18 @@ interface OrgChartPayload {
               @if (node.area_name) {
                 <p class="oc-area">{{ node.area_name }}</p>
               }
+              @if (canReassignNode(node)) {
+                <button
+                  mat-icon-button
+                  type="button"
+                  class="oc-node-action"
+                  matTooltip="Cambiar líder"
+                  aria-label="Cambiar líder"
+                  (click)="openReassignForNode(node, $event)"
+                >
+                  <mat-icon>swap_horiz</mat-icon>
+                </button>
+              }
             </div>
 
             @if (node.children?.length === 1) {
@@ -106,7 +167,7 @@ interface OrgChartPayload {
               <div class="oc-tree oc-tree--multi">
                 <div class="oc-trunk"></div>
                 <div class="oc-multi-shelves">
-                  @for (peerRow of chunkPeers(node.children); track peerRowTrack(peerRow, $index)) {
+                  @for (peerRow of peerShelves(node.children); track peerRowTrack(peerRow, $index)) {
                     @if ($index > 0) {
                       <div class="oc-trunk oc-trunk--chunk-join" aria-hidden="true"></div>
                     }
@@ -170,6 +231,7 @@ interface OrgChartPayload {
               </div>
             </div>
             <div
+              #chartViewport
               class="oc-viewport"
               [class.oc-viewport--dragging]="viewportDragging()"
               (wheel)="onWheel($event)"
@@ -203,7 +265,13 @@ interface OrgChartPayload {
                 @for (row of chunkMembers(block.items); track rowTrack(row, $index)) {
                   <div class="oc-unassigned-row">
                     @for (m of row; track m.id) {
-                      <div class="oc-node oc-node--secondary oc-node--tile">
+                      <div
+                        class="oc-node oc-node--secondary oc-node--tile"
+                        [attr.data-oc-key]="trackKeyForMember(m)"
+                        [class.oc-node--match]="memberMatchesSearch(m)"
+                        [class.oc-node--dim]="memberDimmed(m)"
+                        [class.oc-node--focused]="focusedKey() === trackKeyForMember(m)"
+                      >
                         <div class="oc-avatar oc-avatar--sm" [attr.aria-label]="'Avatar ' + m.name">
                           <span class="oc-avatar-text">{{ initials(m.name) }}</span>
                         </div>
@@ -211,6 +279,18 @@ interface OrgChartPayload {
                         <p class="oc-name oc-name--sm">{{ m.name }}</p>
                         @if (m.area_name) {
                           <p class="oc-area">{{ m.area_name }}</p>
+                        }
+                        @if (canReassignEmployees) {
+                          <button
+                            mat-icon-button
+                            type="button"
+                            class="oc-node-action"
+                            matTooltip="Cambiar líder"
+                            aria-label="Cambiar líder"
+                            (click)="openReassignForMember(m, $event)"
+                          >
+                            <mat-icon>swap_horiz</mat-icon>
+                          </button>
                         }
                       </div>
                     }
@@ -315,7 +395,11 @@ interface OrgChartPayload {
       overflow: hidden;
       border-radius: 12px;
       border: 1px solid rgba(16, 56, 71, 0.12);
-      background: #e8edf1;
+      background-color: #e8edf1;
+      background-image:
+        linear-gradient(rgba(16, 56, 71, 0.07) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(16, 56, 71, 0.07) 1px, transparent 1px);
+      background-size: 22px 22px;
       touch-action: none;
       user-select: none;
       cursor: grab;
@@ -363,13 +447,16 @@ interface OrgChartPayload {
     }
     .oc-group-row {
       display: flex;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
       justify-content: center;
       align-items: flex-start;
       gap: 2rem 2.5rem;
+      width: max-content;
+      max-width: none;
+      margin: 0 auto;
     }
     .oc-spider-arm {
-      flex: 0 1 auto;
+      flex: 0 0 auto;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -608,11 +695,117 @@ interface OrgChartPayload {
     .oc-unassigned-row:last-child {
       margin-bottom: 0;
     }
+    .oc-search-bar {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.65rem;
+      margin-top: 1.25rem;
+      max-width: 36rem;
+    }
+    .oc-search-field {
+      width: 100%;
+    }
+    .oc-search-count,
+    .oc-search-empty {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #0066cc;
+      margin: 0;
+    }
+    .oc-search-empty {
+      color: rgba(10, 10, 10, 0.5);
+    }
+    .oc-search-picks {
+      width: 100%;
+    }
+    .oc-search-picks-title {
+      margin: 0 0 0.45rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #103847;
+    }
+    .oc-search-picks-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      max-height: 11rem;
+      overflow-y: auto;
+      padding-right: 0.15rem;
+    }
+    .oc-search-pick {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.1rem;
+      width: 100%;
+      padding: 0.5rem 0.65rem;
+      border: 1px solid rgba(16, 56, 71, 0.14);
+      border-radius: 8px;
+      background: #fff;
+      cursor: pointer;
+      text-align: left;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .oc-search-pick:hover {
+      border-color: #0066cc;
+      background: #f5faff;
+    }
+    .oc-search-pick--active {
+      border-color: #0066cc;
+      background: #e8f2ff;
+      box-shadow: 0 0 0 1px #0066cc;
+    }
+    .oc-search-pick-name {
+      font-size: 0.86rem;
+      font-weight: 600;
+      color: #0a0a0a;
+    }
+    .oc-search-pick-meta {
+      font-size: 0.72rem;
+      color: rgba(10, 10, 10, 0.55);
+    }
+    .oc-node--match {
+      outline: 2px solid #0066cc;
+      outline-offset: 4px;
+      border-radius: 12px;
+    }
+    .oc-node--focused {
+      outline: 3px solid #e9a319;
+      outline-offset: 5px;
+      border-radius: 12px;
+      animation: oc-focus-pulse 1.2s ease-in-out 2;
+    }
+    @keyframes oc-focus-pulse {
+      0%,
+      100% {
+        outline-color: #e9a319;
+      }
+      50% {
+        outline-color: #0066cc;
+      }
+    }
+    .oc-node--dim {
+      opacity: 0.28;
+      filter: grayscale(0.35);
+    }
+    .oc-node-action {
+      margin-top: 0.35rem;
+      color: #0066cc !important;
+    }
   `,
 })
 export class OrgChartComponent implements OnInit {
+  @ViewChild('chartViewport') private chartViewport?: ElementRef<HTMLElement>;
+
   private readonly api = inject(ApiService);
   private readonly snack = inject(MatSnackBar);
+  private readonly dialog = inject(MatDialog);
+  readonly auth = inject(AuthService);
+
+  /** Expuesto al template para data-oc-key en nodos. */
+  readonly trackKeyForNode = trackKeyForNode;
+  readonly trackKeyForMember = trackKeyForMember;
 
   private lastPtrX = 0;
   private lastPtrY = 0;
@@ -632,8 +825,46 @@ export class OrgChartComponent implements OnInit {
   );
   readonly zoomPercent = computed(() => Math.round(this.zoom() * 100));
 
-  /** Máximo de personas por fila bajo el mismo líder o en “sin líder” (5–6). */
-  readonly maxPeersPerRow = 6;
+  searchText = '';
+  private readonly searchQuery = signal('');
+
+  readonly canReassignEmployees = this.auth.hasPermissionInNamespace('employees');
+  readonly canReassignUsers = this.auth.hasPermissionInNamespace('users');
+
+  readonly searchActive = computed(() => this.searchQuery().trim().length > 0);
+
+  readonly searchMatchKeys = computed(() => {
+    const q = this.searchQuery().trim();
+    const payload = this.data();
+    if (!q || !payload) {
+      return null;
+    }
+    const keys = new Set<string>();
+    for (const p of collectOrgChartPeople(payload)) {
+      if (personMatchesQuery(p, q)) {
+        keys.add(p.key);
+      }
+    }
+    return keys;
+  });
+
+  readonly searchMatchCount = computed(() => this.searchMatchKeys()?.size ?? 0);
+
+  readonly searchResults = computed((): OrgChartPersonRef[] => {
+    const q = this.searchQuery().trim();
+    const payload = this.data();
+    if (!q || !payload) {
+      return [];
+    }
+    return collectOrgChartPeople(payload)
+      .filter((p) => personMatchesQuery(p, q))
+      .sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
+  });
+
+  readonly focusedKey = signal<string | null>(null);
+
+  /** Máximo de colaboradores por fila (empleados bajo un líder y bloque “sin líder”). */
+  readonly maxPeersPerRow = 5;
 
   /** Sin líder: Socios → Gerencia → resto (según texto del cargo). */
   readonly unassignedSections = computed(() => {
@@ -660,11 +891,178 @@ export class OrgChartComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    this.loadOrgChart();
+  }
+
+  onSearchChange(): void {
+    this.searchQuery.set(this.searchText);
+    queueMicrotask(() => this.applySearchNavigation());
+  }
+
+  clearSearch(): void {
+    this.searchText = '';
+    this.searchQuery.set('');
+    this.focusedKey.set(null);
+  }
+
+  focusPerson(key: string): void {
+    this.focusedKey.set(key);
+    queueMicrotask(() => requestAnimationFrame(() => this.navigateToPerson(key)));
+  }
+
+  private applySearchNavigation(): void {
+    const results = this.searchResults();
+    if (results.length === 1) {
+      this.focusPerson(results[0].key);
+    } else if (results.length > 1) {
+      this.focusedKey.set(null);
+    } else {
+      this.focusedKey.set(null);
+    }
+  }
+
+  private navigateToPerson(key: string): void {
+    const escaped = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(key) : key.replace(/"/g, '\\"');
+    const el = document.querySelector(`[data-oc-key="${escaped}"]`) as HTMLElement | null;
+    if (!el) {
+      return;
+    }
+
+    const inChart = el.closest('.oc-viewport');
+    if (inChart && this.chartViewport?.nativeElement) {
+      if (this.zoom() < 0.9) {
+        this.zoom.set(1);
+      }
+      requestAnimationFrame(() => this.centerInChartViewport(el));
+      return;
+    }
+
+    el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+  }
+
+  private centerInChartViewport(el: HTMLElement): void {
+    const viewport = this.chartViewport?.nativeElement;
+    if (!viewport) {
+      return;
+    }
+    const vpRect = viewport.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    const elCenterX = elRect.left + elRect.width / 2 - vpRect.left;
+    const elCenterY = elRect.top + elRect.height / 2 - vpRect.top;
+    const vpCenterX = vpRect.width / 2;
+    const vpCenterY = vpRect.height / 2;
+    this.panX.update((x) => x + (vpCenterX - elCenterX));
+    this.panY.update((y) => y + (vpCenterY - elCenterY));
+  }
+
+  nodeMatchesSearch(node: OrgChartNode): boolean {
+    const keys = this.searchMatchKeys();
+    if (keys === null || node.kind === 'group') {
+      return false;
+    }
+    return keys.has(trackKeyForNode(node));
+  }
+
+  nodeDimmed(node: OrgChartNode): boolean {
+    const keys = this.searchMatchKeys();
+    if (keys === null || node.kind === 'group') {
+      return false;
+    }
+    return !keys.has(trackKeyForNode(node));
+  }
+
+  memberMatchesSearch(m: OrgChartMember): boolean {
+    const keys = this.searchMatchKeys();
+    if (keys === null) {
+      return false;
+    }
+    return keys.has(trackKeyForMember(m));
+  }
+
+  memberDimmed(m: OrgChartMember): boolean {
+    const keys = this.searchMatchKeys();
+    if (keys === null) {
+      return false;
+    }
+    return !keys.has(trackKeyForMember(m));
+  }
+
+  canReassignNode(node: OrgChartNode): boolean {
+    if (node.kind === 'employee') {
+      return this.canReassignEmployees && node.employee_id != null;
+    }
+    if (node.kind === 'user') {
+      return this.canReassignUsers && node.user_id != null;
+    }
+    return false;
+  }
+
+  openReassignForNode(node: OrgChartNode, event: Event): void {
+    event.stopPropagation();
+    const target = this.reassignTargetFromNode(node);
+    if (!target) {
+      return;
+    }
+    this.openReassignDialog(target);
+  }
+
+  openReassignForMember(m: OrgChartMember, event: Event): void {
+    event.stopPropagation();
+    this.openReassignDialog({
+      name: m.name,
+      kind: 'employee',
+      userId: null,
+      employeeId: m.id,
+    });
+  }
+
+  private reassignTargetFromNode(node: OrgChartNode): OrgChartReassignTarget | null {
+    if (node.kind === 'employee' && node.employee_id != null) {
+      return {
+        name: node.name,
+        kind: 'employee',
+        userId: null,
+        employeeId: node.employee_id,
+      };
+    }
+    if (node.kind === 'user' && node.user_id != null) {
+      return {
+        name: node.name,
+        kind: 'user',
+        userId: node.user_id,
+        employeeId: null,
+      };
+    }
+    return null;
+  }
+
+  private openReassignDialog(target: OrgChartReassignTarget): void {
+    this.dialog
+      .open(OrgChartReassignDialogComponent, {
+        width: 'min(96vw, 440px)',
+        data: target,
+      })
+      .afterClosed()
+      .subscribe((ok) => {
+        if (ok) {
+          this.loadOrgChart({ preserveView: true, silent: true });
+          this.snack.open('Líder actualizado', 'Cerrar', { duration: 4000 });
+        }
+      });
+  }
+
+  private loadOrgChart(opts?: { preserveView?: boolean; silent?: boolean }): void {
+    if (!opts?.silent) {
+      this.loading.set(true);
+    }
+    this.error.set(null);
     this.api.get<OrgChartPayload>('/employees/org-chart').subscribe({
       next: (payload) => {
         this.data.set(payload);
         this.loading.set(false);
-        this.resetView();
+        if (!opts?.preserveView) {
+          this.resetView();
+        }
       },
       error: () => {
         this.loading.set(false);
@@ -704,6 +1102,10 @@ export class OrgChartComponent implements OnInit {
     if (e.button !== 0) {
       return;
     }
+    const target = e.target as HTMLElement;
+    if (target.closest('button, a, input, textarea, select, mat-form-field')) {
+      return;
+    }
     const el = e.currentTarget as HTMLElement;
     this.viewportDragging.set(true);
     this.activePointerId = e.pointerId;
@@ -741,7 +1143,7 @@ export class OrgChartComponent implements OnInit {
   }
 
   trackNode(n: OrgChartNode): string {
-    return `${n.kind}-${n.user_id ?? 'u'}-${n.employee_id ?? 'e'}-${n.name}`;
+    return trackKeyForNode(n);
   }
 
   initials(name: string): string {
@@ -761,8 +1163,19 @@ export class OrgChartComponent implements OnInit {
     return (label || '').toUpperCase();
   }
 
-  chunkPeers(nodes: OrgChartNode[] | null | undefined): OrgChartNode[][] {
-    return this.chunkList(nodes ?? [], this.maxPeersPerRow);
+  /**
+   * Bajo un nodo con varios hijos: si todos son empleados, filas de hasta 5; si hay usuarios
+   * (p. ej. varios líderes bajo un superior), una sola fila horizontal.
+   */
+  peerShelves(nodes: OrgChartNode[] | null | undefined): OrgChartNode[][] {
+    const list = nodes ?? [];
+    if (!list.length) {
+      return [];
+    }
+    if (list.every((c) => c.kind === 'employee')) {
+      return this.chunkList(list, this.maxPeersPerRow);
+    }
+    return [list];
   }
 
   chunkMembers(items: OrgChartMember[]): OrgChartMember[][] {
@@ -781,7 +1194,7 @@ export class OrgChartComponent implements OnInit {
     if (!arr.length) {
       return [];
     }
-    const n = Math.max(1, Math.min(6, size));
+    const n = Math.max(1, size);
     const out: T[][] = [];
     for (let i = 0; i < arr.length; i += n) {
       out.push(arr.slice(i, i + n));
