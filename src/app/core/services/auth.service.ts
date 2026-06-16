@@ -85,6 +85,10 @@ export class AuthService {
     return false;
   }
 
+  hasPermission(code: string): boolean {
+    return this.permissionCodes().has(code);
+  }
+
   hasAnyPermission(codes: readonly string[]): boolean {
     const set = this.permissionCodes();
     return codes.some((c) => set.has(c));

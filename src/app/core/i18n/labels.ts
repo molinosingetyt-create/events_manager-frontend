@@ -17,9 +17,16 @@ export const LABELS = {
   incapacityType: {
     general_illness: 'Enfermedad general',
     work_accident: 'Accidente de trabajo',
+    maternity_leave: 'Licencia de maternidad',
+    paternity_leave: 'Licencia de paternidad',
+    bereavement_leave: 'Licencia de luto',
     /** Valores antiguos (histórico / Excel) */
     incapacity: 'Enfermedad general',
     note: 'Accidente de trabajo',
+  },
+  absenteeismClassification: {
+    paid: 'Remunerado',
+    unpaid: 'No remunerado',
   },
   longAbsenceDocumentKind: {
     historia_clinica: 'Historia clínica',

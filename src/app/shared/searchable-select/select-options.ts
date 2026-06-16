@@ -16,6 +16,14 @@ export const ENTITY_STATUS_OPTIONS: SearchableOption<string>[] = [
 export const INCAPACITY_TYPE_OPTIONS: SearchableOption<string>[] = [
   { value: 'general_illness', label: 'Enfermedad general' },
   { value: 'work_accident', label: 'Accidente de trabajo' },
+  { value: 'maternity_leave', label: 'Licencia de maternidad' },
+  { value: 'paternity_leave', label: 'Licencia de paternidad' },
+  { value: 'bereavement_leave', label: 'Licencia de luto' },
+];
+
+export const ABSENTEEISM_CLASSIFICATION_OPTIONS: SearchableOption<string>[] = [
+  { value: 'paid', label: 'Remunerado' },
+  { value: 'unpaid', label: 'No remunerado' },
 ];
 
 export const INCAPACITY_ADMIN_STATUS_OPTIONS: SearchableOption<string>[] = [

@@ -139,12 +139,10 @@ export class EmployeeCreateDialogComponent implements OnInit {
   }
 
   private loadLeadersForArea(areaId: number): void {
-    const params: Record<string, string | number> = {};
-    if (this.auth.hasRole('ADMIN')) {
-      // Admin: sin filtro por área del empleado.
-    } else {
+    const params: Record<string, string | number> = { role: 'LEADER' };
+    // RH, gerencia y admin ven todos los líderes; el líder de equipo solo los de su área.
+    if (this.auth.hasRole('LEADER') && !this.auth.hasAnyRole(['ADMIN', 'HR', 'MANAGEMENT'])) {
       params['area_id'] = areaId;
-      params['role'] = 'LEADER';
     }
     this.api.getAllPages<{ id: number; name: string }>('/users', params).subscribe({
       next: (items) => {

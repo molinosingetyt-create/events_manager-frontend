@@ -211,12 +211,10 @@ export class EmployeeEditDialogComponent implements OnInit {
     keepLeaderId: number | null | undefined,
     keepLeaderName: string | null | undefined,
   ): void {
-    const params: Record<string, string | number> = {};
-    if (this.auth.hasRole('ADMIN')) {
-      // Admin: listado global (sin area_id); el líder puede ser de otra área que la del empleado.
-    } else {
+    const params: Record<string, string | number> = { role: 'LEADER' };
+    // RH, gerencia y admin ven todos los líderes; el líder de equipo solo los de su área.
+    if (this.auth.hasRole('LEADER') && !this.auth.hasAnyRole(['ADMIN', 'HR', 'MANAGEMENT'])) {
       params['area_id'] = areaId;
-      params['role'] = 'LEADER';
     }
     this.api.getAllPages<{ id: number; name: string }>('/users', params).subscribe({
       next: (items) => {

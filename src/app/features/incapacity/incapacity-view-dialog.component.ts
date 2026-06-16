@@ -29,6 +29,7 @@ export interface IncapacityNoteDetail {
   employee_name: string;
   employee_identification?: string;
   type: string;
+  record_kind?: string;
   temporal_category_id: number;
   temporal_category_name: string;
   eps_arl_id: number | null;
@@ -36,7 +37,7 @@ export interface IncapacityNoteDetail {
   diagnosis_id: number | null;
   diagnosis_code: string;
   diagnosis_name: string;
-  description: string;
+  description: string | null;
   support: string | null;
   start_date: string;
   end_date: string | null;
@@ -55,8 +56,8 @@ export interface IncapacityNoteDetail {
     incapacity_id: number;
     start_date: string;
     end_date: string;
-    file_url: string;
-    note: string;
+    file_url: string | null;
+    note: string | null;
     created_by: number;
     created_at: string;
     updated_at: string;
@@ -119,7 +120,13 @@ export interface IncapacityNoteDetail {
                       </div>
                       <div class="hist-sub-line">Inicio: {{ lineStart(h) }}</div>
                       <div class="hist-sub-line">Fin: {{ lineEnd(h) }}</div>
-                      <div class="hist-sub-line">Descripción: {{ detail.description }}</div>
+                      @if (detail.description) {
+                        <div class="hist-sub-line">Descripción: {{ detail.description }}</div>
+                      }
+                      <div class="hist-sub-line">
+                        <strong>Registro:</strong>
+                        {{ detail.record_kind === 'prorroga' ? 'Prórroga' : 'Inicial' }}
+                      </div>
                       @if (detail.long_absence_document_kind) {
                         <div class="hist-sub-line">
                           Documentación (3+ días):
@@ -207,7 +214,10 @@ export interface IncapacityNoteDetail {
                       <div class="hist-sub">
                         <div class="hist-sub-line"><strong>Inicio:</strong> {{ snap.start_date }}</div>
                         <div class="hist-sub-line"><strong>Fin:</strong> {{ snap.end_date }}</div>
-                        <div class="hist-sub-line"><strong>Comentario:</strong> {{ snap.note }}</div>
+                        <div class="hist-sub-line"><strong>Registro:</strong> Prórroga</div>
+                        @if (snap.note) {
+                          <div class="hist-sub-line"><strong>Comentario:</strong> {{ snap.note }}</div>
+                        }
                         @if (snap.file_url) {
                           <div class="hist-sub-line support-img-wrap">
                             <span class="support-img-caption">Soporte (imagen prórroga)</span>
@@ -444,18 +454,20 @@ export class IncapacityViewDialogComponent implements OnInit {
   extensionSnapshot(snapshot: string | null): {
     start_date: string;
     end_date: string;
-    note: string;
-    file_url: string;
+    note: string | null;
+    file_url: string | null;
   } | null {
     const o = this.parseSnapshotObj(snapshot);
     if (!o) {
       return null;
     }
+    const noteRaw = o['note'];
+    const fileRaw = o['file_url'];
     return {
       start_date: String(o['start_date'] ?? ''),
       end_date: String(o['end_date'] ?? ''),
-      note: String(o['note'] ?? ''),
-      file_url: String(o['file_url'] ?? ''),
+      note: noteRaw != null && String(noteRaw).trim() ? String(noteRaw) : null,
+      file_url: fileRaw != null && String(fileRaw).trim() ? String(fileRaw) : null,
     };
   }
 

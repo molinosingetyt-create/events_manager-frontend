@@ -1,6 +1,6 @@
-/** Host del API. Desarrollo contra servidor remoto: IP fija. Solo local (mismo host que el API): `window.location.hostname`. */
-const host = '44.197.169.240';
- //const host = window.location.hostname;
+/** Servidor de producción (mismo host que `environment.prod.ts`). */
+const host = '127.0.0.1';
+/** Solo si el API corre en tu PC: `const host = window.location.hostname;` */
 const apiPort = 8000;
 const httpOrigin = `http://${host}:${apiPort}`;
 

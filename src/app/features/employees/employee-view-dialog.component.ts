@@ -1,5 +1,6 @@
 import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -22,10 +23,26 @@ interface EmployeeRead {
   updated_at: string;
 }
 
+interface EmployeeProfileAccess {
+  employee_id: number;
+  view_level: 'basic' | 'full';
+  can_edit_profile: boolean;
+  can_export: boolean;
+  can_see_alerts: boolean;
+  expediente_available: boolean;
+}
+
 @Component({
   selector: 'em-employee-view-dialog',
   standalone: true,
-  imports: [DatePipe, MatDialogModule, MatButtonModule, MatProgressSpinnerModule, TranslateLabelPipe],
+  imports: [
+    DatePipe,
+    RouterLink,
+    MatDialogModule,
+    MatButtonModule,
+    MatProgressSpinnerModule,
+    TranslateLabelPipe,
+  ],
   template: `
     <div class="em-dialog">
       <h2 mat-dialog-title>Detalle del empleado</h2>
@@ -35,6 +52,15 @@ interface EmployeeRead {
       } @else if (error) {
         <p>No se pudo cargar el empleado.</p>
       } @else if (emp) {
+        @if (profileAccess) {
+          <p class="access-hint" [class.access-hint--full]="profileAccess.view_level === 'full'">
+            @if (profileAccess.view_level === 'full') {
+              Expediente completo (Administración / RRHH / Gerencia).
+            } @else {
+              Vista básica para líderes: solo datos del listado y organigrama.
+            }
+          </p>
+        }
         <div class="detail-lines">
           <p class="detail-line">
             <span class="detail-label">ID:</span>
@@ -76,6 +102,16 @@ interface EmployeeRead {
       }
       </mat-dialog-content>
       <mat-dialog-actions align="end">
+        @if (profileAccess?.view_level === 'full' && emp) {
+          <a
+            mat-stroked-button
+            color="primary"
+            [routerLink]="['/app/employees', emp.id, 'expediente']"
+            mat-dialog-close
+          >
+            Abrir expediente
+          </a>
+        }
         <button mat-flat-button color="warn" mat-dialog-close>Cerrar</button>
       </mat-dialog-actions>
     </div>
@@ -86,6 +122,19 @@ interface EmployeeRead {
       justify-content: center;
       padding: 2rem;
     }
+    .access-hint {
+      margin: 0 0 1rem;
+      padding: 0.65rem 0.85rem;
+      font-size: 0.78rem;
+      line-height: 1.4;
+      border-radius: 8px;
+      background: rgba(10, 10, 10, 0.06);
+      color: rgba(10, 10, 10, 0.72);
+    }
+    .access-hint--full {
+      background: rgba(0, 102, 204, 0.08);
+      color: #103847;
+    }
   `,
 })
 export class EmployeeViewDialogComponent implements OnInit {
@@ -93,6 +142,7 @@ export class EmployeeViewDialogComponent implements OnInit {
   private readonly id = inject(MAT_DIALOG_DATA) as number;
 
   emp: EmployeeRead | null = null;
+  profileAccess: EmployeeProfileAccess | null = null;
   loaded = false;
   error = false;
 
@@ -101,10 +151,22 @@ export class EmployeeViewDialogComponent implements OnInit {
       next: (e) => {
         this.emp = e;
         this.loaded = true;
+        this.loadProfileAccess();
       },
       error: () => {
         this.error = true;
         this.loaded = true;
+      },
+    });
+  }
+
+  private loadProfileAccess(): void {
+    this.api.get<EmployeeProfileAccess>(`/employees/${this.id}/profile-access`).subscribe({
+      next: (a) => {
+        this.profileAccess = a;
+      },
+      error: () => {
+        this.profileAccess = null;
       },
     });
   }

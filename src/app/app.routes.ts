@@ -6,7 +6,9 @@ import { DashboardComponent } from './features/dashboard/dashboard.component';
 import { EmployeesComponent } from './features/employees/employees.component';
 import { IncapacityComponent } from './features/incapacity/incapacity.component';
 import { LoginComponent } from './features/login/login.component';
+import { AbsenteeismComponent } from './features/absenteeism/absenteeism.component';
 import { OvertimeComponent } from './features/overtime/overtime.component';
+import { ShiftsComponent } from './features/shifts/shifts.component';
 import { OrgChartComponent } from './features/org-chart/org-chart.component';
 import { UsersComponent } from './features/users/users.component';
 import { ShellComponent } from './layout/shell.component';
@@ -40,6 +42,24 @@ export const routes: Routes = [
         data: { permissionNamespaces: ['employees'] },
       },
       {
+        path: 'employees/:id/expediente',
+        loadComponent: () =>
+          import('./features/employees/employee-profile.component').then(
+            (m) => m.EmployeeProfileComponent,
+          ),
+        canActivate: [permissionsGuard],
+        data: { anyPermissions: ['employees.profile.full'] },
+      },
+      {
+        path: 'employees/:id/expediente/imprimir',
+        loadComponent: () =>
+          import('./features/employees/employee-profile-print.component').then(
+            (m) => m.EmployeeProfilePrintComponent,
+          ),
+        canActivate: [permissionsGuard],
+        data: { anyPermissions: ['employees.profile.export'] },
+      },
+      {
         path: 'organigrama',
         component: OrgChartComponent,
         canActivate: [permissionsGuard],
@@ -56,6 +76,18 @@ export const routes: Routes = [
         component: IncapacityComponent,
         canActivate: [permissionsGuard],
         data: { permissionNamespaces: ['incapacity'] },
+      },
+      {
+        path: 'ausentismo',
+        component: AbsenteeismComponent,
+        canActivate: [permissionsGuard],
+        data: { permissionNamespaces: ['absenteeism'] },
+      },
+      {
+        path: 'turnos',
+        component: ShiftsComponent,
+        canActivate: [permissionsGuard],
+        data: { permissionNamespaces: ['shifts'] },
       },
       { path: 'incapacity-catalog', redirectTo: 'configuracion/perfil', pathMatch: 'full' },
       {
@@ -94,6 +126,15 @@ export const routes: Routes = [
             data: { permissionNamespaces: ['catalog'] },
             loadComponent: () =>
               import('./features/settings/settings-diagnoses.component').then((m) => m.SettingsDiagnosesComponent),
+          },
+          {
+            path: 'campos-expediente',
+            canActivate: [permissionsGuard],
+            data: { anyPermissions: ['employees.profile.custom_fields.manage'] },
+            loadComponent: () =>
+              import('./features/settings/settings-custom-fields.component').then(
+                (m) => m.SettingsCustomFieldsComponent,
+              ),
           },
           {
             path: 'seguridad',

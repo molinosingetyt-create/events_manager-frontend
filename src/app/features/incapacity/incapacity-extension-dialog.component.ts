@@ -35,10 +35,11 @@ export interface IncapacityExtensionDialogData {
   ],
   template: `
     <div class="em-dialog">
-      <h2 mat-dialog-title>Prórroga</h2>
+      <h2 mat-dialog-title>Prórroga de incapacidad</h2>
       <mat-dialog-content>
         <p class="lead">
-          Registro asociado a la incapacidad <strong>#{{ data.noteId }}</strong>. Todos los campos son obligatorios.
+          Registro de <strong>prórroga</strong> asociado a la incapacidad inicial <strong>#{{ data.noteId }}</strong>.
+          Las fechas son obligatorias; la nota y la imagen son opcionales.
         </p>
         <p class="hint-min">
           La prórroga debe comenzar el mismo día o después del <strong>fin de la incapacidad</strong>
@@ -56,11 +57,11 @@ export interface IncapacityExtensionDialogData {
             </p>
           }
           <mat-form-field appearance="outline" class="full">
-            <mat-label>Nota</mat-label>
+            <mat-label>Nota (opcional)</mat-label>
             <textarea matInput rows="3" formControlName="note" placeholder="Observaciones de la prórroga"></textarea>
           </mat-form-field>
           <div class="file-block">
-            <span class="file-label">Imagen (obligatorio)</span>
+            <span class="file-label">Imagen (opcional)</span>
             <div class="file-actions">
               <button mat-stroked-button type="button" (click)="triggerFilePick()">Elegir imagen</button>
               @if (selectedFile) {
@@ -89,7 +90,7 @@ export interface IncapacityExtensionDialogData {
           color="primary"
           type="button"
           (click)="submit()"
-          [disabled]="form.invalid || loading || !selectedFile"
+          [disabled]="form.invalid || loading"
         >
           @if (loading) {
             <mat-spinner diameter="20" />
@@ -181,7 +182,7 @@ export class IncapacityExtensionDialogComponent implements OnDestroy {
   readonly form = this.fb.group({
     start_date: this.fb.control<Date | null>(null, Validators.required),
     end_date: this.fb.control<Date | null>(null, Validators.required),
-    note: this.fb.nonNullable.control('', [Validators.required, Validators.minLength(1)]),
+    note: this.fb.nonNullable.control(''),
   });
 
   constructor() {
@@ -243,19 +244,24 @@ export class IncapacityExtensionDialogComponent implements OnDestroy {
   }
 
   submit(): void {
-    if (this.form.invalid || !this.selectedFile) {
+    if (this.form.invalid) {
       return;
     }
     const v = this.form.getRawValue();
     this.loading = true;
-    const body = {
+    const noteTrim = v.note.trim();
+    const body: Record<string, string> = {
       start_date: dateToYmd(v.start_date),
       end_date: dateToYmd(v.end_date),
-      note: v.note.trim(),
     };
+    if (noteTrim) {
+      body['note'] = noteTrim;
+    }
     const fd = new FormData();
     fd.append('payload', JSON.stringify(body));
-    fd.append('file', this.selectedFile, this.selectedFile.name);
+    if (this.selectedFile) {
+      fd.append('file', this.selectedFile, this.selectedFile.name);
+    }
     this.api.postFormData(`/incapacity-notes/${this.data.noteId}/extensions`, fd).subscribe({
       next: () => {
         this.loading = false;

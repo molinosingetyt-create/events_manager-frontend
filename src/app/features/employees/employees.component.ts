@@ -1,4 +1,5 @@
 import { Component, ElementRef, OnInit, ViewChild, inject } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -17,11 +18,29 @@ import { RealtimeService } from '../../core/services/realtime.service';
 import { realtimeAffectsTable } from '../../core/utils/realtime-tables';
 import { downloadEmployeeTemplate } from '../../core/utils/excel-catalog-templates';
 import { importEmployeesExcel } from '../../core/utils/excel-import-runners';
+import {
+  downloadProfileExportExcel,
+  type ProfileExportRowApi,
+} from '../../core/utils/employee-profile-export';
+import { EmployeeProfileAlertsDialogComponent } from './employee-profile-alerts-dialog.component';
 import { TranslateLabelPipe } from '../../core/pipes/translate-label.pipe';
 import { EmployeeCreateDialogComponent } from './employee-create-dialog.component';
 import { EmployeeEditDialogComponent } from './employee-edit-dialog.component';
 import { EmployeeViewDialogComponent } from './employee-view-dialog.component';
 import { ImportLoadingOverlayComponent } from '../../shared/import-loading-overlay/import-loading-overlay.component';
+import {
+  SearchableSelectComponent,
+  type SearchableOption,
+} from '../../shared/searchable-select/searchable-select.component';
+import { ENTITY_STATUS_OPTIONS } from '../../shared/searchable-select/select-options';
+import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
+import {
+  COLLABORATOR_STATUS_OPTIONS,
+  CONTRACT_TYPE_OPTIONS,
+  HIERARCHICAL_LEVEL_OPTIONS,
+  LINKAGE_TYPE_OPTIONS,
+  WORK_SITE_OPTIONS,
+} from './employee-profile-options';
 
 interface EmployeeRow {
   id: number;
@@ -49,6 +68,9 @@ interface EmployeeRow {
     MatSnackBarModule,
     MatFormFieldModule,
     MatInputModule,
+    RouterLink,
+    ReactiveFormsModule,
+    SearchableSelectComponent,
     TranslateLabelPipe,
     ImportLoadingOverlayComponent,
   ],
@@ -56,8 +78,8 @@ interface EmployeeRow {
     <em-import-loading-overlay [active]="excelBusy" />
     <div class="page-head">
       <h1>Empleados</h1>
-      @if (auth.hasAnyRole(['ADMIN', 'HR'])) {
-        <div class="actions">
+      <div class="actions">
+        @if (canManageEmployees()) {
           <button mat-flat-button color="primary" type="button" (click)="openCreate()">
             <mat-icon>person_add</mat-icon>
             Nuevo empleado
@@ -70,8 +92,20 @@ interface EmployeeRow {
             <mat-icon>upload_file</mat-icon>
             Importar Excel
           </button>
-        </div>
-      }
+        }
+        @if (canExportProfiles()) {
+          <button mat-stroked-button type="button" (click)="exportProfilesExcel()" [disabled]="excelBusy">
+            <mat-icon>table_view</mat-icon>
+            Exportar expedientes
+          </button>
+        }
+        @if (canSeeProfileAlerts()) {
+          <button mat-stroked-button type="button" (click)="openAlertsDialog()" [disabled]="excelBusy">
+            <mat-icon>notifications</mat-icon>
+            Alertas expedientes
+          </button>
+        }
+      </div>
       <p class="page-lead">
         Listado de personal y datos laborales.
       </p>
@@ -88,7 +122,81 @@ interface EmployeeRow {
           autocomplete="off"
         />
       </mat-form-field>
+      <button mat-stroked-button type="button" (click)="showFilters = !showFilters">
+        <mat-icon>filter_list</mat-icon>
+        Filtros
+      </button>
     </div>
+    @if (showFilters) {
+      <mat-card class="filters-card">
+        <mat-card-content>
+          <form [formGroup]="filterForm" class="filters-grid">
+            <em-searchable-select
+              label="Área"
+              [control]="filterForm.controls.area_id"
+              [options]="areaOptions"
+              [allowNull]="true"
+              nullLabel="Todas"
+            />
+            @if (leaderOptions.length) {
+              <em-searchable-select
+                label="Líder"
+                [control]="filterForm.controls.leader_id"
+                [options]="leaderOptions"
+                [allowNull]="true"
+                nullLabel="Todos"
+              />
+            }
+            <em-searchable-select
+              label="Estado registro"
+              [control]="filterForm.controls.status"
+              [options]="statusOptions"
+              [allowNull]="true"
+              nullLabel="Todos"
+            />
+            <em-searchable-select
+              label="Sede"
+              [control]="filterForm.controls.work_site_city"
+              [options]="workSiteFilterOptions"
+              [allowNull]="true"
+              nullLabel="Todas"
+            />
+            <em-searchable-select
+              label="Nivel jerárquico"
+              [control]="filterForm.controls.hierarchical_level"
+              [options]="levelFilterOptions"
+              [allowNull]="true"
+              nullLabel="Todos"
+            />
+            <em-searchable-select
+              label="Tipo contrato"
+              [control]="filterForm.controls.contract_type"
+              [options]="contractFilterOptions"
+              [allowNull]="true"
+              nullLabel="Todos"
+            />
+            <em-searchable-select
+              label="Estado colaborador"
+              [control]="filterForm.controls.collaborator_status"
+              [options]="collaboratorFilterOptions"
+              [allowNull]="true"
+              nullLabel="Todos"
+            />
+            <em-searchable-select
+              label="Vinculación"
+              [control]="filterForm.controls.linkage_type"
+              [options]="linkageFilterOptions"
+              [allowNull]="true"
+              nullLabel="Todas"
+            />
+          </form>
+          <div class="filters-actions">
+            <button mat-button type="button" (click)="clearFilters()">Limpiar</button>
+            <button mat-flat-button color="primary" type="button" (click)="applyFilters()">Aplicar</button>
+          </div>
+        </mat-card-content>
+      </mat-card>
+    }
     <mat-card>
       <mat-card-content class="table-scroll">
         <table mat-table [dataSource]="rows" class="full">
@@ -131,7 +239,19 @@ interface EmployeeRow {
                 >
                   <mat-icon>visibility</mat-icon>
                 </button>
-                @if (auth.hasAnyRole(['ADMIN', 'HR'])) {
+                @if (canOpenFullProfile()) {
+                  <a
+                    mat-icon-button
+                    class="action-btn-profile"
+                    [routerLink]="['/app/employees', r.id, 'expediente']"
+                    matTooltip="Expediente HR completo"
+                    matTooltipPosition="above"
+                    aria-label="Expediente HR"
+                  >
+                    <mat-icon>badge</mat-icon>
+                  </a>
+                }
+                @if (canEditEmployees()) {
                   <button
                     mat-icon-button
                     type="button"
@@ -143,6 +263,8 @@ interface EmployeeRow {
                   >
                     <mat-icon>edit</mat-icon>
                   </button>
+                }
+                @if (canDeleteEmployees()) {
                   <button
                     mat-icon-button
                     type="button"
@@ -191,10 +313,29 @@ interface EmployeeRow {
       border: 0;
     }
     .search-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.75rem;
       margin-bottom: 1rem;
     }
     .search-field {
       width: min(100%, 420px);
+      flex: 1;
+    }
+    .filters-card {
+      margin-bottom: 1rem;
+    }
+    .filters-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 0.25rem 1rem;
+    }
+    .filters-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
     }
     .search-prefix {
       margin-right: 0.25rem;
@@ -212,7 +353,53 @@ export class EmployeesComponent implements OnInit {
   private readonly dialog = inject(MatDialog);
   private readonly snack = inject(MatSnackBar);
   private readonly realtime = inject(RealtimeService);
+  private readonly fb = inject(FormBuilder);
   readonly auth = inject(AuthService);
+
+  showFilters = false;
+  areaOptions: SearchableOption<number>[] = [];
+  leaderOptions: SearchableOption<number>[] = [];
+  workSiteFilterOptions: SearchableOption<string>[] = [];
+  levelFilterOptions: SearchableOption<string>[] = [];
+  contractFilterOptions: SearchableOption<string>[] = [];
+  collaboratorFilterOptions: SearchableOption<string>[] = [];
+  linkageFilterOptions: SearchableOption<string>[] = [];
+  readonly statusOptions = ENTITY_STATUS_OPTIONS;
+
+  filterForm = this.fb.group({
+    area_id: [null as number | null],
+    leader_id: [null as number | null],
+    status: [null as string | null],
+    work_site_city: [null as string | null],
+    hierarchical_level: [null as string | null],
+    contract_type: [null as string | null],
+    collaborator_status: [null as string | null],
+    linkage_type: [null as string | null],
+  });
+
+  canManageEmployees(): boolean {
+    return this.auth.hasAnyPermission(['employees.create', 'employees.edit']);
+  }
+
+  canEditEmployees(): boolean {
+    return this.auth.hasPermission('employees.edit');
+  }
+
+  canDeleteEmployees(): boolean {
+    return this.auth.hasPermission('employees.delete');
+  }
+
+  canOpenFullProfile(): boolean {
+    return this.auth.hasPermission('employees.profile.full');
+  }
+
+  canExportProfiles(): boolean {
+    return this.auth.hasPermission('employees.profile.export');
+  }
+
+  canSeeProfileAlerts(): boolean {
+    return this.auth.hasPermission('employees.profile.alerts');
+  }
 
   @ViewChild('employeeFileInput') employeeFileInput?: ElementRef<HTMLInputElement>;
 
@@ -226,6 +413,31 @@ export class EmployeesComponent implements OnInit {
 
   excelBusy = false;
 
+  openAlertsDialog(): void {
+    this.dialog.open(EmployeeProfileAlertsDialogComponent, { width: '720px', maxWidth: '95vw' });
+  }
+
+  exportProfilesExcel(): void {
+    this.excelBusy = true;
+    this.api
+      .get<{ rows: ProfileExportRowApi[] }>('/employees/profile-export', { active_only: true })
+      .subscribe({
+        next: async (res) => {
+          try {
+            await downloadProfileExportExcel(res.rows ?? []);
+            this.snack.open('Excel de expedientes generado', 'Cerrar', { duration: 3000 });
+          } catch {
+            this.snack.open('No se pudo generar el Excel', 'Cerrar', { duration: 4000 });
+          }
+          this.excelBusy = false;
+        },
+        error: () => {
+          this.snack.open('No se pudo exportar expedientes', 'Cerrar', { duration: 4000 });
+          this.excelBusy = false;
+        },
+      });
+  }
+
   rows: EmployeeRow[] = [];
   total = 0;
   page = 1;
@@ -236,6 +448,50 @@ export class EmployeesComponent implements OnInit {
   readonly columns = ['id', 'name', 'identification_number', 'position', 'temporal', 'status', 'actions'];
 
   ngOnInit(): void {
+    this.loadFilterOptions();
+    this.load();
+  }
+
+  private loadFilterOptions(): void {
+    this.api
+      .get<{
+        areas: { id: number; name: string }[];
+        leaders: { id: number; name: string }[];
+        work_site_cities: string[];
+        hierarchical_levels: string[];
+        contract_types: string[];
+        collaborator_statuses: string[];
+        linkage_types: string[];
+      }>('/employees/filter-options')
+      .subscribe({
+        next: (o) => {
+          this.areaOptions = o.areas.map((a) => ({ value: a.id, label: a.name }));
+          this.leaderOptions = o.leaders.map((l) => ({ value: l.id, label: l.name }));
+          this.workSiteFilterOptions = this.toOptions(o.work_site_cities, WORK_SITE_OPTIONS);
+          this.levelFilterOptions = this.toOptions(o.hierarchical_levels, HIERARCHICAL_LEVEL_OPTIONS);
+          this.contractFilterOptions = this.toOptions(o.contract_types, CONTRACT_TYPE_OPTIONS);
+          this.collaboratorFilterOptions = this.toOptions(
+            o.collaborator_statuses,
+            COLLABORATOR_STATUS_OPTIONS,
+          );
+          this.linkageFilterOptions = this.toOptions(o.linkage_types, LINKAGE_TYPE_OPTIONS);
+        },
+      });
+  }
+
+  private toOptions(values: string[], catalog: SearchableOption<string>[]): SearchableOption<string>[] {
+    const labels = new Map(catalog.map((c) => [c.value, c.label]));
+    return values.map((v) => ({ value: v, label: labels.get(v) ?? v }));
+  }
+
+  applyFilters(): void {
+    this.page = 1;
+    this.load();
+  }
+
+  clearFilters(): void {
+    this.filterForm.reset();
+    this.page = 1;
     this.load();
   }
 
@@ -299,6 +555,15 @@ export class EmployeesComponent implements OnInit {
     if (this.searchQuery) {
       params['search'] = this.searchQuery;
     }
+    const f = this.filterForm.getRawValue();
+    if (f.area_id != null) params['area_id'] = f.area_id;
+    if (f.leader_id != null) params['leader_id'] = f.leader_id;
+    if (f.status) params['status'] = f.status;
+    if (f.work_site_city) params['work_site_city'] = f.work_site_city;
+    if (f.hierarchical_level) params['hierarchical_level'] = f.hierarchical_level;
+    if (f.contract_type) params['contract_type'] = f.contract_type;
+    if (f.collaborator_status) params['collaborator_status'] = f.collaborator_status;
+    if (f.linkage_type) params['linkage_type'] = f.linkage_type;
     this.api.get<Paginated<EmployeeRow>>('/employees', params).subscribe((res) => {
       this.rows = res.items;
       this.total = res.total;
@@ -334,7 +599,7 @@ export class EmployeesComponent implements OnInit {
     this.excelBusy = true;
     try {
       const summary = await importEmployeesExcel(this.api, file, {
-        leaderAssignFromAllUsersInArea: this.auth.hasRole('ADMIN'),
+        leaderAssignFromAllUsersInArea: this.auth.hasAnyRole(['ADMIN', 'HR', 'MANAGEMENT']),
       });
       const msg = `Creados: ${summary.created}. Filas vacías omitidas: ${summary.skipped}.`;
       if (summary.errors.length === 0) {

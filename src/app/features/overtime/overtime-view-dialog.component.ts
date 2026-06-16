@@ -30,6 +30,9 @@ export interface OvertimeRequestDetail {
   requester: UserBrief;
   date: string;
   hours: string;
+  start_time?: string | null;
+  end_time?: string | null;
+  time_range_label?: string | null;
   justification: string;
   status: string;
   approved_by: number | null;
@@ -68,7 +71,8 @@ export interface OvertimeRequestDetail {
                     <div class="hist-sub">
                       <div class="hist-sub-line">Empleado: {{ detail.employee_name }}</div>
                       <div class="hist-sub-line">Fecha trabajo: {{ lineDate(h) }}</div>
-                      <div class="hist-sub-line">Horas:{{ lineHours(h) }}</div>
+                      <div class="hist-sub-line">Franja: {{ lineTimeRange(h) }}</div>
+                      <div class="hist-sub-line">Horas: {{ lineHours(h) }}</div>
                       <div class="hist-sub-line">Justificación: {{ detail.justification }}</div>
                     </div>
                   }
@@ -245,6 +249,17 @@ export class OvertimeViewDialogComponent implements OnInit {
     return this.detail?.hours ?? '';
   }
 
+  lineTimeRange(h: HistoryEntry): string {
+    const o = this.parseSnapshotObj(h.snapshot);
+    if (o?.['start_time'] && o?.['end_time']) {
+      return `${String(o['start_time']).slice(0, 5)} – ${String(o['end_time']).slice(0, 5)}`;
+    }
+    if (this.detail?.time_range_label) {
+      return this.detail.time_range_label;
+    }
+    return '—';
+  }
+
   /** Líneas legibles desde el snapshot JSON (actualizaciones). */
   snapshotLines(snapshot: string | null): string[] {
     const o = this.parseSnapshotObj(snapshot);
@@ -258,8 +273,11 @@ export class OvertimeViewDialogComponent implements OnInit {
     if (o['date'] != null) {
       lines.push(`Fecha trabajo: ${String(o['date'])}`);
     }
+    if (o['start_time'] != null && o['end_time'] != null) {
+      lines.push(`Franja: ${String(o['start_time']).slice(0, 5)} – ${String(o['end_time']).slice(0, 5)}`);
+    }
     if (o['hours'] != null) {
-      lines.push(`Horas:${String(o['hours'])}`);
+      lines.push(`Horas: ${String(o['hours'])}`);
     }
     if (o['status'] != null) {
       lines.push(`Estado: ${String(o['status'])}`);

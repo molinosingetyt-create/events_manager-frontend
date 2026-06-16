@@ -5,12 +5,21 @@ export interface OrgChartPersonRef {
   name: string;
   position: string;
   areaName: string;
-  kind: 'user' | 'employee';
+  kind: 'user' | 'employee' | 'manual';
   userId: number | null;
   employeeId: number | null;
 }
 
 export function trackKeyForNode(node: OrgChartNode): string {
+  if (node.kind === 'leader_shelf' && node.display_key) {
+    return `manual-${node.display_key}`;
+  }
+  if (node.kind === 'manual' && node.layout_node_id != null) {
+    return `manual-${node.layout_node_id}`;
+  }
+  if (node.display_key) {
+    return `manual-${node.display_key}`;
+  }
   return `${node.kind}-${node.user_id ?? 'u'}-${node.employee_id ?? 'e'}-${node.name}`;
 }
 
@@ -22,13 +31,22 @@ export function collectOrgChartPeople(payload: OrgChartPayload): OrgChartPersonR
   const out: OrgChartPersonRef[] = [];
   const walk = (nodes: OrgChartNode[]): void => {
     for (const n of nodes) {
-      if (n.kind === 'user' || n.kind === 'employee') {
+      if (n.kind === 'leader_shelf') {
+        if (n.leaders?.length) {
+          walk(n.leaders);
+        }
+        if (n.children?.length) {
+          walk(n.children);
+        }
+        continue;
+      }
+      if (n.kind === 'user' || n.kind === 'employee' || n.kind === 'manual') {
         out.push({
           key: trackKeyForNode(n),
           name: n.name,
           position: n.position_label,
           areaName: n.area_name,
-          kind: n.kind,
+          kind: n.kind === 'manual' ? 'manual' : n.kind,
           userId: n.user_id,
           employeeId: n.employee_id,
         });

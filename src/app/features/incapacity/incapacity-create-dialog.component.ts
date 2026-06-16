@@ -13,6 +13,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatRadioModule } from '@angular/material/radio';
+import { MatSelectModule } from '@angular/material/select';
 import { forkJoin } from 'rxjs';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
@@ -59,14 +60,29 @@ interface FormOptions {
     MatButtonModule,
     MatProgressSpinnerModule,
     MatRadioModule,
+    MatSelectModule,
     SearchableSelectComponent,
     DateFieldComponent,
   ],
   template: `
     <div class="em-dialog">
-      <h2 mat-dialog-title>Nueva incapacidad</h2>
+      <h2 mat-dialog-title>{{ isProrroga() ? 'Nueva prórroga de incapacidad' : 'Nueva incapacidad' }}</h2>
       <mat-dialog-content>
         <form [formGroup]="form" class="form">
+          <div class="record-kind-block">
+            <span class="support-label">Tipo de registro</span>
+            <mat-radio-group formControlName="record_kind" class="radio-row">
+              <mat-radio-button value="inicial">Inicial</mat-radio-button>
+              <mat-radio-button value="prorroga">Prórroga</mat-radio-button>
+            </mat-radio-group>
+            <p class="record-kind-hint">
+              @if (isProrroga()) {
+                Complete el mismo formulario; el registro quedará marcado como <strong>prórroga</strong>.
+              } @else {
+                Registre una incapacidad <strong>inicial</strong> (primer periodo de ausencia).
+              }
+            </p>
+          </div>
           <em-searchable-select
             label="Empleado"
             [control]="form.controls.employee_id"
@@ -96,12 +112,26 @@ interface FormOptions {
               [allowNull]="true"
               nullLabel="Sin diagnóstico"
             />
-            <mat-form-field appearance="outline" class="full">
-              <mat-label>Descripción</mat-label>
-              <textarea matInput rows="3" formControlName="description"></textarea>
-            </mat-form-field>
-            <em-date-field label="Fecha inicio" [control]="form.controls.start_date" />
-            <em-date-field label="Fecha fin" [control]="form.controls.end_date" />
+            <em-date-field label="Fecha inicio real" [control]="form.controls.start_date" />
+            <em-date-field label="Fecha fin real" [control]="form.controls.end_date" />
+            <div class="quincena-row">
+              <mat-form-field appearance="outline">
+                <mat-label>Año causación</mat-label>
+                <input matInput type="number" min="2000" max="2100" formControlName="causation_year" />
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Mes causación</mat-label>
+                <input matInput type="number" min="1" max="12" formControlName="causation_month" />
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Quincena</mat-label>
+                <mat-select formControlName="causation_half">
+                  <mat-option [value]="null">—</mat-option>
+                  <mat-option [value]="1">1ª quincena</mat-option>
+                  <mat-option [value]="2">2ª quincena</mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
             <p class="date-hint">
               Para ausencias de más de un día indique <strong>fecha fin</strong>. El sistema cuenta los días de forma
               inclusiva (inicio y fin cuentan).
@@ -110,11 +140,11 @@ interface FormOptions {
               <p class="error-hint">La fecha fin no puede ser anterior a la fecha de inicio.</p>
             }
             <div class="primary-support">
-              <span class="support-label">Soporte de la incapacidad (imagen obligatoria)</span>
+              <span class="support-label">Soporte de la incapacidad (imagen opcional)</span>
               <p class="support-hint">
-                Primera imagen: documento o foto del <strong>soporte principal de la incapacidad</strong>. Si el caso es
-                de <strong>3 o más días</strong>, más abajo deberá adjuntar un <strong>segundo</strong> archivo: historia
-                clínica o incapacidad transcrita por EPS, según elija.
+                Documento o foto del <strong>soporte principal de la incapacidad</strong>. Si el caso es de
+                <strong>3 o más días</strong>, puede adjuntar un <strong>segundo</strong> archivo: historia clínica o
+                incapacidad transcrita por EPS, según elija.
               </p>
               <div class="support-actions">
                 <button mat-stroked-button type="button" (click)="triggerPrimaryCamera()">Tomar foto</button>
@@ -158,8 +188,8 @@ interface FormOptions {
                 </mat-radio-group>
                 @if (selectedKind() === 'historia_clinica') {
                   <div class="extra-support">
-                    <span class="support-label">Soporte adicional — historia clínica (obligatorio)</span>
-                    <p class="support-hint">Adjunte la imagen de la historia clínica.</p>
+                    <span class="support-label">Soporte adicional — historia clínica (opcional)</span>
+                    <p class="support-hint">Puede adjuntar la imagen de la historia clínica.</p>
                     <div class="support-actions">
                       <button mat-stroked-button type="button" (click)="triggerHistoriaCamera()">Tomar foto</button>
                       <button mat-stroked-button type="button" (click)="triggerHistoriaGallery()">Elegir imagen</button>
@@ -192,7 +222,7 @@ interface FormOptions {
                 @if (selectedKind() === 'incapacidad_eps') {
                   <div class="extra-support">
                     <span class="support-label">Incapacidad transcrita por EPS</span>
-                    <p class="support-hint">Adjunte obligatoriamente una <strong>foto</strong> del documento.</p>
+                    <p class="support-hint">Puede adjuntar una <strong>foto</strong> del documento.</p>
                     <div class="support-actions">
                       <button mat-stroked-button type="button" (click)="triggerEpsCamera()">Tomar foto</button>
                       <button mat-stroked-button type="button" (click)="triggerEpsGallery()">Elegir imagen</button>
@@ -224,8 +254,10 @@ interface FormOptions {
                 }
               </div>
             }
-            @if (!auth.hasAnyRole(['ADMIN', 'MANAGEMENT'])) {
-              <p class="hint">El registro quedará pendiente hasta que gerencia o administración lo apruebe o rechace.</p>
+            @if (!auth.hasPermission('incapacity.approve')) {
+              <p class="hint">
+                El registro quedará pendiente hasta que un usuario con permiso de aprobación lo apruebe o rechace.
+              </p>
             }
           }
         </form>
@@ -237,12 +269,12 @@ interface FormOptions {
           color="primary"
           type="button"
           (click)="submit()"
-          [disabled]="!catalogsReady() || form.invalid || loading || !extrasValid()"
+          [disabled]="!catalogsReady() || form.invalid || loading"
         >
           @if (loading) {
             <mat-spinner diameter="20" />
           } @else {
-            Crear
+            {{ isProrroga() ? 'Guardar prórroga' : 'Crear' }}
           }
         </button>
       </mat-dialog-actions>
@@ -254,6 +286,11 @@ interface FormOptions {
       flex-direction: column;
       min-width: min(100%, 420px);
       padding-top: 0.5rem;
+    }
+    .quincena-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(100px, 1fr));
+      gap: 0.5rem;
     }
     .pick-hint {
       font-size: 0.875rem;
@@ -304,6 +341,26 @@ interface FormOptions {
       margin-top: 1rem;
       padding-top: 0.75rem;
       border-top: 1px dashed rgba(25, 118, 210, 0.35);
+    }
+    .record-kind-block {
+      margin-bottom: 1rem;
+      padding: 0.75rem 0.85rem;
+      border-radius: 8px;
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      background: rgba(25, 118, 210, 0.04);
+    }
+    .record-kind-hint {
+      font-size: 0.8125rem;
+      color: rgba(0, 0, 0, 0.6);
+      margin: 0.5rem 0 0;
+      line-height: 1.45;
+    }
+    .radio-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem 1.25rem;
+      align-items: center;
+      margin-top: 0.35rem;
     }
     .radio-col {
       display: flex;
@@ -369,7 +426,6 @@ export class IncapacityCreateDialogComponent implements OnInit, OnDestroy {
   @ViewChild('historiaGalleryInput') historiaGalleryInput?: ElementRef<HTMLInputElement>;
   @ViewChild('epsCameraInput') epsCameraInput?: ElementRef<HTMLInputElement>;
   @ViewChild('epsGalleryInput') epsGalleryInput?: ElementRef<HTMLInputElement>;
-
   employeeOptions: SearchableOption<number>[] = [];
   temporalOptions: SearchableOption<number>[] = [];
   epsOptions: SearchableOption<number>[] = [];
@@ -384,16 +440,18 @@ export class IncapacityCreateDialogComponent implements OnInit, OnDestroy {
   historiaPreviewUrl: string | null = null;
   epsPhotoFile: File | null = null;
   epsPreviewUrl: string | null = null;
-
   readonly form = this.fb.group({
+    record_kind: this.fb.nonNullable.control<'inicial' | 'prorroga'>('inicial', Validators.required),
     employee_id: this.fb.nonNullable.control(0, { validators: [Validators.required, Validators.min(1)] }),
     type: this.fb.nonNullable.control('general_illness', Validators.required),
     temporal_category_id: this.fb.control<number | null>(null, Validators.required),
     eps_arl_id: this.fb.control<number | null>(null),
     diagnosis_id: this.fb.control<number | null>(null),
-    description: this.fb.nonNullable.control('', Validators.required),
     start_date: this.fb.control<Date | null>(null, Validators.required),
     end_date: this.fb.control<Date | null>(null),
+    causation_year: this.fb.control<number | null>(new Date().getFullYear()),
+    causation_month: this.fb.control<number | null>(new Date().getMonth() + 1),
+    causation_half: this.fb.control<number | null>(null),
     long_absence_document_kind: this.fb.control<'historia_clinica' | 'incapacidad_eps' | null>(null),
   });
 
@@ -402,9 +460,11 @@ export class IncapacityCreateDialogComponent implements OnInit, OnDestroy {
     'temporal_category_id',
     'eps_arl_id',
     'diagnosis_id',
-    'description',
     'start_date',
     'end_date',
+    'causation_year',
+    'causation_month',
+    'causation_half',
     'long_absence_document_kind',
   ] as const;
 
@@ -436,6 +496,10 @@ export class IncapacityCreateDialogComponent implements OnInit, OnDestroy {
     });
   }
 
+  isProrroga(): boolean {
+    return this.form.controls.record_kind.value === 'prorroga';
+  }
+
   private setSecondaryEnabled(on: boolean): void {
     for (const k of this.secondaryFields) {
       const c = this.form.get(k);
@@ -454,9 +518,11 @@ export class IncapacityCreateDialogComponent implements OnInit, OnDestroy {
         temporal_category_id: null,
         eps_arl_id: null,
         diagnosis_id: null,
-        description: '',
         start_date: null,
         end_date: null,
+        causation_year: new Date().getFullYear(),
+        causation_month: new Date().getMonth() + 1,
+        causation_half: null,
         long_absence_document_kind: null,
       },
       { emitEvent: false },
@@ -540,24 +606,6 @@ export class IncapacityCreateDialogComponent implements OnInit, OnDestroy {
     if (this.epsPreviewUrl) {
       URL.revokeObjectURL(this.epsPreviewUrl);
     }
-  }
-
-  extrasValid(): boolean {
-    if (!this.primaryFile) {
-      return false;
-    }
-    const days = this.inclusiveDays();
-    if (days < 3) {
-      return true;
-    }
-    const kind = this.form.getRawValue().long_absence_document_kind;
-    if (!kind) {
-      return false;
-    }
-    if (kind === 'historia_clinica') {
-      return !!this.historiaFile;
-    }
-    return !!this.epsPhotoFile;
   }
 
   inclusiveDays(): number {
@@ -684,7 +732,7 @@ export class IncapacityCreateDialogComponent implements OnInit, OnDestroy {
   }
 
   submit(): void {
-    if (!this.catalogsReady() || this.form.invalid || !this.extrasValid()) {
+    if (!this.catalogsReady() || this.form.invalid) {
       return;
     }
     const v = this.form.getRawValue();
@@ -696,11 +744,11 @@ export class IncapacityCreateDialogComponent implements OnInit, OnDestroy {
 
     const body: Record<string, unknown> = {
       employee_id: v.employee_id,
+      record_kind: v.record_kind,
       type: v.type,
       temporal_category_id: v.temporal_category_id,
-      description: v.description,
       start_date: dateToYmd(v.start_date),
-      status: this.auth.hasAnyRole(['ADMIN', 'MANAGEMENT']) ? 'active' : 'pending',
+      status: this.auth.hasPermission('incapacity.approve') ? 'active' : 'pending',
       long_absence_document_kind: days >= 3 ? v.long_absence_document_kind : null,
     };
     if (v.eps_arl_id != null) {
@@ -713,6 +761,9 @@ export class IncapacityCreateDialogComponent implements OnInit, OnDestroy {
     if (endYmd) {
       body['end_date'] = endYmd;
     }
+    if (v.causation_year != null) body['causation_year'] = v.causation_year;
+    if (v.causation_month != null) body['causation_month'] = v.causation_month;
+    if (v.causation_half != null) body['causation_half'] = v.causation_half;
     const fd = new FormData();
     fd.append('payload', JSON.stringify(body));
     if (this.primaryFile) {

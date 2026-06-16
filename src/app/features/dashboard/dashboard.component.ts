@@ -79,6 +79,20 @@ import { TranslateLabelPipe } from '../../core/pipes/translate-label.pipe';
           <span class="tile-desc">Registro y seguimiento</span>
         </a>
       }
+      @if (auth.hasPermissionInNamespace('absenteeism')) {
+        <a class="tile" routerLink="/app/ausentismo">
+          <mat-icon class="tile-icon" aria-hidden="true">event_busy</mat-icon>
+          <span class="tile-title">Ausentismo</span>
+          <span class="tile-desc">Remunerado y no remunerado</span>
+        </a>
+      }
+      @if (auth.hasPermissionInNamespace('shifts')) {
+        <a class="tile" routerLink="/app/turnos">
+          <mat-icon class="tile-icon" aria-hidden="true">calendar_month</mat-icon>
+          <span class="tile-title">Turnos</span>
+          <span class="tile-desc">Programación horaria</span>
+        </a>
+      }
     </section>
 
     <mat-card class="hint-card">

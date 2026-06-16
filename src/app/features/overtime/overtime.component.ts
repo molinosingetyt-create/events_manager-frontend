@@ -8,6 +8,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { openReportExportPeriodDialog } from '../../shared/report-export-period-dialog/open-report-export-period-dialog';
 import { LABELS } from '../../core/i18n/labels';
 import { ApiService, Paginated } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
@@ -27,6 +28,9 @@ interface OvertimeListRow {
   requester: { id: number; name: string; email: string };
   date: string;
   hours: string;
+  start_time?: string | null;
+  end_time?: string | null;
+  time_range_label?: string | null;
   justification: string;
   status: string;
   approved_by: number | null;
@@ -54,9 +58,9 @@ interface OvertimeListRow {
     <div class="page-head">
       <h1>Solicitudes de horas extra</h1>
       <div class="actions">
-        <button mat-stroked-button type="button" [disabled]="exporting" (click)="downloadExcel()">
+        <button mat-stroked-button type="button" [disabled]="exporting" (click)="openExportDialog()">
           <mat-icon>download</mat-icon>
-          {{ exporting ? 'Generando…' : 'Descargar Excel' }}
+          {{ exporting ? 'Generando…' : 'Descargar reporte' }}
         </button>
         @if (auth.hasAnyRole(['ADMIN', 'HR', 'MANAGEMENT', 'LEADER'])) {
           <button mat-flat-button color="primary" type="button" (click)="openCreate()">
@@ -81,6 +85,10 @@ interface OvertimeListRow {
           <ng-container matColumnDef="date">
             <th mat-header-cell *matHeaderCellDef>Fecha</th>
             <td mat-cell *matCellDef="let r">{{ r.date }}</td>
+          </ng-container>
+          <ng-container matColumnDef="time_range">
+            <th mat-header-cell *matHeaderCellDef>Franja horaria</th>
+            <td mat-cell *matCellDef="let r">{{ timeRangeLabel(r) }}</td>
           </ng-container>
           <ng-container matColumnDef="hours">
             <th mat-header-cell *matHeaderCellDef>Horas</th>
@@ -214,7 +222,7 @@ export class OvertimeComponent implements OnInit {
   pageSize = 20;
   exporting = false;
 
-  readonly tableColumns = ['id', 'employee', 'date', 'hours', 'status', 'actions'];
+  readonly tableColumns = ['id', 'employee', 'date', 'time_range', 'hours', 'status', 'actions'];
 
   /** Clases visuales para el estado (pending / rejected / approved). */
   statusPillClass(status: string): Record<string, boolean> {
@@ -239,46 +247,71 @@ export class OvertimeComponent implements OnInit {
     });
   }
 
-  downloadExcel(): void {
-    if (this.exporting) {
-      return;
-    }
+  openExportDialog(): void {
+    if (this.exporting) return;
+    openReportExportPeriodDialog(this.dialog, {
+      title: 'Reporte de horas extra',
+      description: 'Seleccione el periodo de corte para exportar las solicitudes de horas extra.',
+    })
+      .afterClosed()
+      .subscribe((period) => {
+        if (period) this.downloadExcel(period.dateFrom, period.dateTo);
+      });
+  }
+
+  private downloadExcel(dateFrom: string, dateTo: string): void {
     this.exporting = true;
-    this.api.getAllPages<OvertimeListRow>('/overtime-requests').subscribe({
-      next: async (items) => {
-        try {
-          const { downloadExcelFile } = await import('../../core/utils/excel-download');
-          const statusMap = LABELS.entityStatus as Record<string, string>;
-          const rows = items.map((r) => ({
-            ID: r.id,
-            Empleado: r.employee_name,
-            Fecha: r.date,
-            Horas: r.hours,
-            Estado: statusMap[r.status] ?? r.status,
-            Justificación: r.justification,
-            Solicitante: r.requester?.name ?? '',
-            'Correo solicitante': r.requester?.email ?? '',
-            Aprobador: r.approver?.name ?? '',
-            'Correo aprobador': r.approver?.email ?? '',
-            'Comentario de decisión': r.approval_comment?.trim() ? r.approval_comment : '',
-            'Creado': r.created_at,
-            'Actualizado': r.updated_at,
-          }));
-          const stamp = new Date().toISOString().slice(0, 10);
-          await downloadExcelFile(rows, `horas_extra_${stamp}.xlsx`, 'Horas extra');
-        } finally {
+    this.api
+      .getAllPages<OvertimeListRow>('/overtime-requests', { date_from: dateFrom, date_to: dateTo })
+      .subscribe({
+        next: async (items) => {
+          try {
+            const { downloadExcelFile } = await import('../../core/utils/excel-download');
+            const statusMap = LABELS.entityStatus as Record<string, string>;
+            const rows = items.map((r) => ({
+              ID: r.id,
+              Empleado: r.employee_name,
+              Fecha: r.date,
+              'Franja horaria': this.timeRangeLabel(r),
+              Horas: r.hours,
+              Estado: statusMap[r.status] ?? r.status,
+              Justificación: r.justification,
+              Solicitante: r.requester?.name ?? '',
+              'Correo solicitante': r.requester?.email ?? '',
+              Aprobador: r.approver?.name ?? '',
+              'Correo aprobador': r.approver?.email ?? '',
+              'Comentario de decisión': r.approval_comment?.trim() ? r.approval_comment : '',
+              'Creado': r.created_at,
+              'Actualizado': r.updated_at,
+            }));
+            await downloadExcelFile(
+              rows,
+              `horas_extra_${dateFrom}_${dateTo}.xlsx`,
+              'Horas extra',
+            );
+          } finally {
+            this.exporting = false;
+          }
+        },
+        error: () => {
           this.exporting = false;
-        }
-      },
-      error: () => {
-        this.exporting = false;
-      },
-    });
+        },
+      });
+  }
+
+  timeRangeLabel(r: OvertimeListRow): string {
+    if (r.time_range_label?.trim()) {
+      return r.time_range_label;
+    }
+    if (r.start_time && r.end_time) {
+      return `${r.start_time.slice(0, 5)} – ${r.end_time.slice(0, 5)}`;
+    }
+    return '—';
   }
 
   openCreate(): void {
     this.dialog
-      .open(OvertimeCreateDialogComponent, { width: 'min(96vw, 520px)' })
+      .open(OvertimeCreateDialogComponent, { width: 'min(96vw, 560px)' })
       .afterClosed()
       .subscribe((ok) => {
         if (ok) {

@@ -135,6 +135,18 @@ import { TranslateLabelPipe } from '../core/pipes/translate-label.pipe';
               <span matListItemTitle>Incapacidad</span>
             </a>
           }
+          @if (auth.hasPermissionInNamespace('absenteeism')) {
+            <a mat-list-item routerLink="/app/ausentismo" routerLinkActive="active">
+              <mat-icon matListItemIcon>event_busy</mat-icon>
+              <span matListItemTitle>Ausentismo</span>
+            </a>
+          }
+          @if (auth.hasPermissionInNamespace('shifts')) {
+            <a mat-list-item routerLink="/app/turnos" routerLinkActive="active">
+              <mat-icon matListItemIcon>calendar_month</mat-icon>
+              <span matListItemTitle>Turnos</span>
+            </a>
+          }
           <div class="nav-group">
             <div class="nav-group-title">Configuraciones</div>
             <a
@@ -196,6 +208,17 @@ import { TranslateLabelPipe } from '../core/pipes/translate-label.pipe';
               >
                 <mat-icon matListItemIcon>assignment</mat-icon>
                 <span matListItemTitle>Diagnósticos</span>
+              </a>
+            }
+            @if (auth.hasPermission('employees.profile.custom_fields.manage')) {
+              <a
+                mat-list-item
+                routerLink="/app/configuracion/campos-expediente"
+                routerLinkActive="active"
+                class="nav-sub-item"
+              >
+                <mat-icon matListItemIcon>tune</mat-icon>
+                <span matListItemTitle>Campos expediente</span>
               </a>
             }
           </div>
